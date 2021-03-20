@@ -107,79 +107,134 @@ impl Machine {
                 Ok(())
             }
             0x3000 => {
-                let index = ((opcode & 0x0F00) >> 8) as usize;
+                let a = ((opcode & 0x0F00) >> 8) as usize;
                 let constant = (opcode & 0x00FF) as u8;
                 debug(&format!(
                     "[{:#06X}] skip if V{:X} == {:#04X}",
-                    opcode, index, constant
+                    opcode, a, constant
                 ));
-                if self.registers[index] == constant {
+                if self.registers[a] == constant {
                     self.program_counter += 2;
                 }
                 Ok(())
             }
             0x4000 => {
-                let index = ((opcode & 0x0F00) >> 8) as usize;
+                let a = ((opcode & 0x0F00) >> 8) as usize;
                 let constant = (opcode & 0x00FF) as u8;
                 debug(&format!(
                     "[{:#06X}] skip if V{:X} != {:#04X}",
-                    opcode, index, constant
+                    opcode, a, constant
                 ));
-                if self.registers[index] != constant {
+                if self.registers[a] != constant {
                     self.program_counter += 2;
                 }
                 Ok(())
             }
             0x5000 => {
-                let first_index = ((opcode & 0x0F00) >> 8) as usize;
-                let second_index = ((opcode & 0x00F0) >> 4) as usize;
-                debug(&format!(
-                    "[{:#06X}] skip if V{:X} == V{:X}",
-                    opcode, first_index, second_index
-                ));
-                if self.registers[first_index] == self.registers[second_index] {
+                let a = ((opcode & 0x0F00) >> 8) as usize;
+                let b = ((opcode & 0x00F0) >> 4) as usize;
+                debug(&format!("[{:#06X}] skip if V{:X} == V{:X}", opcode, a, b));
+                if self.registers[a] == self.registers[b] {
                     self.program_counter += 2;
                 }
                 Ok(())
             }
             0x6000 => {
-                let index = ((opcode & 0x0F00) >> 8) as usize;
+                let a = ((opcode & 0x0F00) >> 8) as usize;
                 let constant = (opcode & 0x00FF) as u8;
-                debug(&format!(
-                    "[{:#06X}] V{:X} = {:#04X}",
-                    opcode, index, constant
-                ));
-                self.registers[index] = constant;
+                debug(&format!("[{:#06X}] V{:X} = {:#04X}", opcode, a, constant));
+                self.registers[a] = constant;
                 Ok(())
             }
             0x7000 => {
-                let index = ((opcode & 0x0F00) >> 8) as usize;
+                let a = ((opcode & 0x0F00) >> 8) as usize;
                 let constant = (opcode & 0x00FF) as u8;
-                debug(&format!(
-                    "[{:#06X}] V{:X} += {:#04X}",
-                    opcode, index, constant
-                ));
-                let result = self.registers[index].wrapping_add(constant);
-                self.registers[index] = result;
+                debug(&format!("[{:#06X}] V{:X} += {:#04X}", opcode, a, constant));
+                let result = self.registers[a].wrapping_add(constant);
+                self.registers[a] = result;
                 Ok(())
             }
-            0x9000 => {
-                match opcode & 0x000F {
-                    0 => {
-                        // TODO: VX = VY
-                        Err(format!("Unhandled op-code: {:#06X}", opcode))
-                    }
-                    _ => Err(format!("Unhandled op-code: {:#06X}", opcode)),
+            0x8000 => match opcode & 0x000F {
+                0x0 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    let b = ((opcode & 0x00F0) >> 4) as usize;
+                    debug(&format!("[{:#06X}] V{:X} = V{:X}", opcode, a, b));
+                    self.registers[a] = self.registers[b];
+                    Ok(())
                 }
-            }
+                0x1 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    let b = ((opcode & 0x00F0) >> 4) as usize;
+                    debug(&format!("[{:#06X}] V{:X} = V{:X} | V{:X}", opcode, a, a, b));
+                    self.registers[a] = self.registers[a] | self.registers[b];
+                    Ok(())
+                }
+                0x2 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    let b = ((opcode & 0x00F0) >> 4) as usize;
+                    debug(&format!("[{:#06X}] V{:X} = V{:X} & V{:X}", opcode, a, a, b));
+                    self.registers[a] = self.registers[a] & self.registers[b];
+                    Ok(())
+                }
+                0x3 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    let b = ((opcode & 0x00F0) >> 4) as usize;
+                    debug(&format!("[{:#06X}] V{:X} = V{:X} ^ V{:X}", opcode, a, a, b));
+                    self.registers[a] = self.registers[a] ^ self.registers[b];
+                    Ok(())
+                }
+                0x4 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    let b = ((opcode & 0x00F0) >> 4) as usize;
+                    debug(&format!("[{:#06X}] V{:X} = V{:X} + V{:X}", opcode, a, a, b));
+                    let result = self.registers[a] as u16 + self.registers[b] as u16;
+                    self.registers[a] = (result & 0xFF) as u8;
+                    self.registers[0xF] = if result > 0xFF { 1 } else { 0 };
+                    Ok(())
+                }
+                0x5 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    let b = ((opcode & 0x00F0) >> 4) as usize;
+                    debug(&format!("[{:#06X}] V{:X} = V{:X} - V{:X}", opcode, a, a, b));
+                    let result = self.registers[a] as i16 - self.registers[b] as i16;
+                    self.registers[a] = (result % 0x100i16) as u8;
+                    self.registers[0xF] = if result < 0 { 0 } else { 1 };
+                    Ok(())
+                }
+                0x6 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    debug(&format!("[{:#06X}] V{:X} >>= 1", opcode, a));
+                    self.registers[0xF] = if self.registers[a] & 1 == 1 { 1 } else { 0 };
+                    self.registers[a] >>= 1;
+                    Ok(())
+                }
+                0x7 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    let b = ((opcode & 0x00F0) >> 4) as usize;
+                    debug(&format!("[{:#06X}] V{:X} = V{:X} - V{:X}", opcode, a, b, a));
+                    let result = self.registers[b] as i16 - self.registers[a] as i16;
+                    self.registers[a] = (result % 0x100i16) as u8;
+                    self.registers[0xF] = if result < 0 { 0 } else { 1 };
+                    Ok(())
+                }
+                0xE => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    debug(&format!("[{:#06X}] V{:X} <<= 1", opcode, a));
+                    self.registers[0xF] = if self.registers[a] & 0b1000_0000 == 0b1000_0000 {
+                        1
+                    } else {
+                        0
+                    };
+                    self.registers[a] <<= 1;
+                    Ok(())
+                }
+                _ => Err(format!("Unhandled op-code: {:#06X}", opcode)),
+            },
             0x9000 => {
-                let first_index = ((opcode & 0x0F00) >> 8) as usize;
-                let second_index = ((opcode & 0x00F0) >> 4) as usize;
-                debug(&format!(
-                    "[{:#06X}] skip if V{:X} != V{:X}",
-                    opcode, first_index, second_index
-                ));
-                if self.registers[first_index] != self.registers[second_index] {
+                let a = ((opcode & 0x0F00) >> 8) as usize;
+                let b = ((opcode & 0x00F0) >> 4) as usize;
+                debug(&format!("[{:#06X}] skip if V{:X} != V{:X}", opcode, a, b));
+                if self.registers[a] != self.registers[b] {
                     self.program_counter += 2;
                 }
                 Ok(())
@@ -223,6 +278,14 @@ impl Machine {
                     debug(&format!("[{:#06X}] dump(V{:X})", opcode, end_index));
                     for i in 0..end_index + 1 {
                         self.memory[self.address_register as usize + i] = self.registers[i];
+                    }
+                    Ok(())
+                }
+                0x65 => {
+                    let end_index = ((opcode & 0x0F00) >> 8) as usize;
+                    debug(&format!("[{:#06X}] load(V{:X})", opcode, end_index));
+                    for i in 0..end_index + 1 {
+                        self.registers[i] = self.memory[self.address_register as usize + i];
                     }
                     Ok(())
                 }
@@ -391,6 +454,181 @@ fn test_8xy0_set_vx_to_vy() {
 }
 
 #[test]
+fn test_8xy1_set_vx_to_vx_or_vy() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0x2] = 0b0100_1111;
+    m.registers[0xA] = 0b0110_0100;
+
+    // V2 = V2 | VA
+    m.execute_opcode(0x82A1).unwrap();
+
+    assert_eq!(m.registers[0x2], 0b0110_1111);
+    assert_eq!(m.registers[0xA], 0b0110_0100);
+}
+
+#[test]
+fn test_8xy2_set_vx_to_vx_and_vy() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0x2] = 0b0100_1111;
+    m.registers[0xA] = 0b0110_0100;
+
+    // V2 = V2 & VA
+    m.execute_opcode(0x82A2).unwrap();
+
+    assert_eq!(m.registers[0x2], 0b0100_0100);
+    assert_eq!(m.registers[0xA], 0b0110_0100);
+}
+
+#[test]
+fn test_8xy3_set_vx_to_vx_xor_vy() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0x2] = 0b0100_1111;
+    m.registers[0xA] = 0b0110_0100;
+
+    // V2 = V2 ^ VA
+    m.execute_opcode(0x82A3).unwrap();
+
+    assert_eq!(m.registers[0x2], 0b0010_1011);
+    assert_eq!(m.registers[0xA], 0b0110_0100);
+}
+
+#[test]
+fn test_8xy4_add_vy_to_vx() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xF] = 3;
+    m.registers[0x6] = 53;
+    m.registers[0x0] = 22;
+
+    // V6 = V6 + V0
+    m.execute_opcode(0x8604).unwrap();
+
+    assert_eq!(m.registers[0x6], 75);
+    assert_eq!(m.registers[0xF], 0);
+}
+
+#[test]
+fn test_8xy4_add_vy_to_vx_carry() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xF] = 3;
+    m.registers[0x6] = 0xFF;
+    m.registers[0x0] = 22;
+
+    // V6 = V6 + V0
+    m.execute_opcode(0x8604).unwrap();
+
+    assert_eq!(m.registers[0x6], 21);
+    assert_eq!(m.registers[0xF], 1);
+}
+
+#[test]
+fn test_8xy5_subtract_vy_from_vx() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xF] = 3;
+    m.registers[0x6] = 110;
+    m.registers[0x0] = 60;
+
+    // V6 = V6 - V0
+    m.execute_opcode(0x8605).unwrap();
+
+    assert_eq!(m.registers[0x6], 50);
+    assert_eq!(m.registers[0xF], 1);
+}
+
+#[test]
+fn test_8xy5_subtract_vy_from_vx_borrow() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xF] = 3;
+    m.registers[0x6] = 60;
+    m.registers[0x0] = 110;
+
+    // V6 = V6 - V0
+    m.execute_opcode(0x8605).unwrap();
+
+    assert_eq!(m.registers[0x6], 206);
+    assert_eq!(m.registers[0xF], 0);
+}
+
+#[test]
+fn test_8xy6_shift_right() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xF] = 3;
+    m.registers[0x2] = 0b01011110;
+
+    // V2 >>= 1
+    m.execute_opcode(0x8206).unwrap();
+
+    assert_eq!(m.registers[0x2], 0b00101111);
+    assert_eq!(m.registers[0xF], 0);
+}
+
+#[test]
+fn test_8xy6_shift_right_carry() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xF] = 3;
+    m.registers[0x2] = 0b01011101;
+
+    // V2 >>= 1
+    m.execute_opcode(0x8206).unwrap();
+
+    assert_eq!(m.registers[0x2], 0b00101110);
+    assert_eq!(m.registers[0xF], 1);
+}
+
+#[test]
+fn test_8xy7_set_vx_to_vy_minus_vx() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xF] = 3;
+    m.registers[0x6] = 60;
+    m.registers[0x0] = 110;
+
+    // V6 = V0 - V6
+    m.execute_opcode(0x8607).unwrap();
+
+    assert_eq!(m.registers[0x6], 50);
+    assert_eq!(m.registers[0xF], 1);
+}
+
+#[test]
+fn test_8xy7_set_vx_to_vy_minus_vx_borrow() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xF] = 3;
+    m.registers[0x6] = 110;
+    m.registers[0x0] = 60;
+
+    // V6 = V0 - V6
+    m.execute_opcode(0x8607).unwrap();
+
+    assert_eq!(m.registers[0x6], 206);
+    assert_eq!(m.registers[0xF], 0);
+}
+
+#[test]
+fn test_8xye_shift_left() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xF] = 3;
+    m.registers[0x2] = 0b01011101;
+
+    // V2 <<= 1
+    m.execute_opcode(0x820E).unwrap();
+
+    assert_eq!(m.registers[0x2], 0b10111010);
+    assert_eq!(m.registers[0xF], 0);
+}
+
+#[test]
+fn test_8xye_shift_left_carry() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xF] = 3;
+    m.registers[0x2] = 0b10011101;
+
+    // V2 <<= 1
+    m.execute_opcode(0x820E).unwrap();
+
+    assert_eq!(m.registers[0x2], 0b00111010);
+    assert_eq!(m.registers[0xF], 1);
+}
+
+#[test]
 fn test_9xy0_skip_if_registers_not_eq() {
     let mut m = Machine::new([0; 0x1000]);
     m.program_counter = 5;
@@ -495,6 +733,25 @@ fn test_fx55_dump_registers_to_memory() {
 }
 
 #[test]
+fn test_fx65_load_memory_into_registers() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0x0] = 0x77;
+    m.registers[0x1] = 0x77;
+    m.registers[0x2] = 0x77;
+    m.registers[0x3] = 0x77;
+    m.address_register = 0x0F05;
+    m.memory[0x0F05] = 0x0A;
+    m.memory[0x0F06] = 0x0B;
+    m.memory[0x0F07] = 0x0C;
+    m.memory[0x0F08] = 0x0D;
+
+    // load V0-2
+    m.execute_opcode(0xF265).unwrap();
+
+    assert_eq!(&m.registers[0x0..0x4], [0x0A, 0x0B, 0x0C, 0x77]);
+}
+
+#[test]
 fn test_rom() {
     use std::fs::File;
     use std::io::Read;
@@ -508,7 +765,7 @@ fn test_rom() {
     m.program_counter = 0x200;
 
     // TODO Run longer
-    for _ in 0..50 {
+    for _ in 0..200 {
         m.step().unwrap();
     }
 }
