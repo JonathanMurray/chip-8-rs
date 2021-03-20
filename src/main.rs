@@ -1,4 +1,5 @@
 use rust_chip_8::{Machine, FONT_SPRITES};
+use std::env;
 use std::fs::File;
 use std::io::Read;
 
@@ -17,9 +18,8 @@ use piston_window::{
 
 const SCALING: u32 = 8;
 
-fn setup_machine() -> Machine {
-    //let mut f = File::open("test_opcode.ch8").expect("Open test file");
-    let mut f = File::open("Pong (1 player).ch8").expect("Open test file");
+fn setup_machine(filename: &str) -> Machine {
+    let mut f = File::open(filename).expect("Open test file");
     let mut buffer = Vec::new();
     f.read_to_end(&mut buffer).expect("Read from test file");
     let mut memory = [0; 0x1000];
@@ -33,13 +33,30 @@ fn setup_machine() -> Machine {
 }
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    let filename;
+    match args.len() {
+        1 => {
+            filename = "Space Invaders [David Winter].ch8";
+        }
+        2 => {
+            filename = &args[1];
+        }
+        _ => {
+            println!("Usage: {} [filename]", args[0]);
+            std::process::exit(1);
+        }
+    }
+
+    println!("Running {}", filename);
+
     let mut window: PistonWindow = WindowSettings::new("CHIP-8", [64 * SCALING, 32 * SCALING])
         .graphics_api(OpenGL::V3_2)
         .exit_on_esc(true)
         .build()
         .unwrap();
 
-    let mut machine = setup_machine();
+    let mut machine = setup_machine(&filename);
 
     let raw_image_buf = vec![0; 4 * 64 as usize * 32 as usize];
     let mut image_buffer: ImageBuffer<Rgba<u8>, Vec<u8>> =
@@ -95,29 +112,29 @@ fn main() {
         }
 
         if let Some(update_args) = e.update_args() {
-            machine.update(update_args.dt);
+            machine.update(update_args.dt).expect("Machine update");
         }
     }
 }
 
 fn handle_key(machine: &mut Machine, key: Key, pressed: bool) {
     match key {
-        Key::D0 => machine.pressed_keys[0x0] = pressed,
-        Key::D1 => machine.pressed_keys[0x1] = pressed,
-        Key::D2 => machine.pressed_keys[0x2] = pressed,
-        Key::D3 => machine.pressed_keys[0x3] = pressed,
-        Key::D4 => machine.pressed_keys[0x4] = pressed,
-        Key::D5 => machine.pressed_keys[0x5] = pressed,
-        Key::D6 => machine.pressed_keys[0x6] = pressed,
-        Key::D7 => machine.pressed_keys[0x7] = pressed,
-        Key::D8 => machine.pressed_keys[0x8] = pressed,
-        Key::D9 => machine.pressed_keys[0x9] = pressed,
-        Key::A => machine.pressed_keys[0xA] = pressed,
-        Key::B => machine.pressed_keys[0xB] = pressed,
-        Key::C => machine.pressed_keys[0xC] = pressed,
-        Key::D => machine.pressed_keys[0xD] = pressed,
-        Key::E => machine.pressed_keys[0xE] = pressed,
-        Key::F => machine.pressed_keys[0xF] = pressed,
+        Key::D0 => machine.handle_key_event(0x0, pressed),
+        Key::D1 => machine.handle_key_event(0x1, pressed),
+        Key::D2 => machine.handle_key_event(0x2, pressed),
+        Key::D3 => machine.handle_key_event(0x3, pressed),
+        Key::D4 => machine.handle_key_event(0x4, pressed),
+        Key::D5 => machine.handle_key_event(0x5, pressed),
+        Key::D6 => machine.handle_key_event(0x6, pressed),
+        Key::D7 => machine.handle_key_event(0x7, pressed),
+        Key::D8 => machine.handle_key_event(0x8, pressed),
+        Key::D9 => machine.handle_key_event(0x9, pressed),
+        Key::A => machine.handle_key_event(0xA, pressed),
+        Key::B => machine.handle_key_event(0xB, pressed),
+        Key::C => machine.handle_key_event(0xC, pressed),
+        Key::D => machine.handle_key_event(0xD, pressed),
+        Key::E => machine.handle_key_event(0xE, pressed),
+        Key::F => machine.handle_key_event(0xF, pressed),
         _ => {}
     }
 }

@@ -26,7 +26,7 @@ pub const FONT_SPRITES: [u8; 5 * 16] = [
 ];
 
 const INTERVAL_60_HZ: f64 = 1.0 / 60.0;
-const INTERVAL_500_HZ: f64 = 1.0 / 500.0;
+const INTERVAL_500_HZ: f64 = 1.0 / 4500.0;
 
 fn debug(message: &str) {
     //println!("{}", message);
@@ -51,6 +51,12 @@ impl DisplayBuffer {
         let y = y % SCREEN_HEIGHT;
         let index = y as usize * SCREEN_WIDTH as usize + x as usize;
         self.0[index]
+    }
+
+    fn clear(&mut self) {
+        for i in 0..self.0.len() {
+            self.0[i] = false;
+        }
     }
 }
 
@@ -84,6 +90,7 @@ pub struct Machine {
     random: Box<dyn RngCore>,
     pub pressed_keys: [bool; 16],
     cycle_cooldown: f64,
+    register_blocking_on_key_press: Option<u8>,
 }
 
 impl Machine {
@@ -102,14 +109,25 @@ impl Machine {
             random: Box::from(StdRng::seed_from_u64(222)),
             pressed_keys: [false; 16],
             cycle_cooldown: 0.0,
+            register_blocking_on_key_press: None,
         }
     }
 
-    pub fn update(&mut self, elapsed_time: f64) {
+    pub fn handle_key_event(&mut self, key: u8, pressed: bool) {
+        self.pressed_keys[key as usize] = pressed;
+        if let Some(blocking_register) = self.register_blocking_on_key_press {
+            if pressed {
+                self.registers[blocking_register as usize] = key;
+                self.register_blocking_on_key_press = None;
+            }
+        }
+    }
+
+    pub fn update(&mut self, elapsed_time: f64) -> Result<(), String> {
         self.cycle_cooldown -= elapsed_time;
         while self.cycle_cooldown <= 0.0 {
             self.cycle_cooldown += INTERVAL_500_HZ;
-            self.step();
+            self.step()?;
         }
 
         self.timer_cooldown -= elapsed_time;
@@ -122,9 +140,14 @@ impl Machine {
                 self.sound_timer -= 1;
             }
         }
+        Ok(())
     }
 
     fn step(&mut self) -> Result<(), String> {
+        if self.register_blocking_on_key_press.is_some() {
+            return Ok(());
+        }
+
         let addr = self.program_counter as usize;
         debug(&format!("{:#05X}", addr));
         let opcode = ((self.memory[addr] as u16) << 8) | self.memory[addr + 1] as u16;
@@ -143,7 +166,11 @@ impl Machine {
                         self.program_counter = self.stack[self.stack_pointer as usize];
                         Ok(())
                     }
-                    0x00e0 => Err(format!("TODO: Implement 00e0")),
+                    0x00e0 => {
+                        debug(&format!("[{:#06X}] clear screen", opcode));
+                        self.display_buffer.clear();
+                        Ok(())
+                    }
                     _ => {
                         let address = opcode & 0x0FFF;
                         debug(&format!(
@@ -312,6 +339,12 @@ impl Machine {
                 self.address_register = address;
                 Ok(())
             }
+            0xB000 => {
+                let address = opcode & 0x0FFF;
+                debug(&format!("[{:#06X}] jump to V0 + {:#04X}", opcode, address));
+                self.program_counter = self.registers[0] as u16 + address;
+                Ok(())
+            }
             0xC000 => {
                 let a = ((opcode & 0x0F00) >> 8) as usize;
                 let constant = (opcode & 0x00FF) as u8;
@@ -378,6 +411,12 @@ impl Machine {
                     self.registers[a] = self.delay_timer;
                     Ok(())
                 }
+                0x0A => {
+                    let a = ((opcode & 0x0F00) >> 8) as u8;
+                    debug(&format!("[{:#06X}] V{:X} = get_key()", opcode, a));
+                    self.register_blocking_on_key_press = Some(a);
+                    Ok(())
+                }
                 0x15 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     debug(&format!("[{:#06X}] I = delay_timer(V{:X})", opcode, a));
@@ -388,6 +427,13 @@ impl Machine {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     debug(&format!("[{:#06X}] I = sound_timer(V{:X})", opcode, a));
                     self.sound_timer = self.registers[a];
+                    Ok(())
+                }
+                0x1E => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    debug(&format!("[{:#06X}] I += V{:X}", opcode, a));
+                    self.address_register =
+                        self.address_register.wrapping_add(self.registers[a] as u16);
                     Ok(())
                 }
                 0x29 => {
@@ -758,7 +804,7 @@ fn test_9xy0_skip_if_registers_not_eq() {
     m.registers[0x2] = 0x75;
     m.registers[0xA] = 0x99;
 
-    // Skip if V2 != VA
+    // skip if V2 != VA
     m.execute_opcode(0x92A0).unwrap();
 
     assert_eq!(m.program_counter, 7);
@@ -772,6 +818,17 @@ fn test_annn_set_address_register() {
     m.execute_opcode(0xAF38).unwrap();
 
     assert_eq!(m.address_register, 0xF38);
+}
+
+#[test]
+fn test_bnnn_jump_to_v0_plus_constant() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0] = 0x33;
+
+    // jump to V0 + 0x345 
+    m.execute_opcode(0xB345).unwrap();
+
+    assert_eq!(m.program_counter, 0x378);
 }
 
 #[test]
@@ -891,6 +948,16 @@ fn test_fx07_set_vx_to_delay_timer() {
 }
 
 #[test]
+fn test_fx0a_wait_for_key_press() {
+    let mut m = Machine::new([0; 0x1000]);
+
+    // V8 = get_key()
+    m.execute_opcode(0xF80A).unwrap();
+
+    assert_eq!(m.register_blocking_on_key_press, Some(0x8));
+}
+
+#[test]
 fn test_fx15_set_delay_timer_to_vx() {
     let mut m = Machine::new([0; 0x1000]);
     m.registers[0x5] = 37;
@@ -910,6 +977,18 @@ fn test_fx18_set_sound_timer_to_vx() {
     m.execute_opcode(0xF418).unwrap();
 
     assert_eq!(m.sound_timer, 100);
+}
+
+#[test]
+fn test_fx1e_add_vx_to_i() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.address_register = 5;
+    m.registers[0x2] = 3;
+
+    // I += V2
+    m.execute_opcode(0xF21E).unwrap();
+
+    assert_eq!(m.address_register, 8);
 }
 
 #[test]
@@ -980,6 +1059,28 @@ fn test_fx65_load_memory_into_registers() {
     m.execute_opcode(0xF265).unwrap();
 
     assert_eq!(&m.registers[0x0..0x4], [0x0A, 0x0B, 0x0C, 0x77]);
+}
+
+#[test]
+fn test_blocking_on_key_press_prevents_execution() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.register_blocking_on_key_press = Some(0x3);
+    m.program_counter = 5;
+
+    m.update(1.0);
+
+    assert_eq!(m.program_counter, 5);
+}
+
+#[test]
+fn test_receiving_key_press_while_blocking() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.register_blocking_on_key_press = Some(0x3);
+
+    m.handle_key_event(0x8, true);
+
+    assert_eq!(m.register_blocking_on_key_press, None);
+    assert_eq!(m.registers[0x3], 0x8);
 }
 
 #[test]
