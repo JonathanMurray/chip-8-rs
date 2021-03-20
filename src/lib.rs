@@ -161,36 +161,40 @@ impl Machine {
         self.execute_opcode(opcode)
     }
 
+    fn push_program_counter(&mut self) {
+        self.stack[self.stack_pointer as usize] = self.program_counter;
+        self.stack_pointer += 1;
+    }
+
+    fn pop_program_counter(&mut self) {
+        self.stack_pointer -= 1;
+        self.program_counter = self.stack[self.stack_pointer as usize];
+    }
+
     fn execute_opcode(&mut self, opcode: u16) -> Result<(), String> {
         match opcode & 0xF000 {
-            0x0000 => {
-                match opcode {
-                    0x00ee => {
-                        debug(&format!("[{:#06X}] return", opcode));
-                        // TODO extract to pop
-                        self.stack_pointer -= 1;
-                        self.program_counter = self.stack[self.stack_pointer as usize];
-                        Ok(())
-                    }
-                    0x00e0 => {
-                        debug(&format!("[{:#06X}] clear screen", opcode));
-                        self.display_buffer.clear();
-                        Ok(())
-                    }
-                    _ => {
-                        let address = opcode & 0x0FFF;
-                        debug(&format!(
-                            "[{:#06X}] call (machine): {:#05X}",
-                            opcode, address
-                        ));
-                        //TODO: extract to push method
-                        self.stack[self.stack_pointer as usize] = self.program_counter;
-                        self.stack_pointer += 1;
-                        self.program_counter = address;
-                        Ok(())
-                    }
+            0x0000 => match opcode {
+                0x00ee => {
+                    debug(&format!("[{:#06X}] return", opcode));
+                    self.pop_program_counter();
+                    Ok(())
                 }
-            }
+                0x00e0 => {
+                    debug(&format!("[{:#06X}] clear screen", opcode));
+                    self.display_buffer.clear();
+                    Ok(())
+                }
+                _ => {
+                    let address = opcode & 0x0FFF;
+                    debug(&format!(
+                        "[{:#06X}] call (machine): {:#05X}",
+                        opcode, address
+                    ));
+                    self.push_program_counter();
+                    self.program_counter = address;
+                    Ok(())
+                }
+            },
             0x1000 => {
                 let address = opcode & 0x0FFF;
                 debug(&format!("[{:#06X}] jump: {:#05X}", opcode, address));
@@ -200,9 +204,7 @@ impl Machine {
             0x2000 => {
                 let address = opcode & 0x0FFF;
                 debug(&format!("[{:#06X}] call: {:#05X}", opcode, address));
-                //TODO: extract to push method
-                self.stack[self.stack_pointer as usize] = self.program_counter;
-                self.stack_pointer += 1;
+                self.push_program_counter();
                 self.program_counter = address;
                 Ok(())
             }
@@ -1073,7 +1075,7 @@ fn test_blocking_on_key_press_prevents_execution() {
     m.register_blocking_on_key_press = Some(0x3);
     m.program_counter = 5;
 
-    m.update(1.0);
+    m.update(1.0).unwrap();
 
     assert_eq!(m.program_counter, 5);
 }
@@ -1102,7 +1104,6 @@ fn test_rom() {
     }
     m.program_counter = 0x200;
 
-    // TODO Run longer
     for _ in 0..1000 {
         m.step().unwrap();
     }
