@@ -273,6 +273,14 @@ impl Machine {
                 Ok(())
             }
             0xF000 => match opcode & 0x00FF {
+                0x33 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    debug(&format!("[{:#06X}] BCD(V{:X})", opcode, a));
+                    self.memory[self.address_register as usize] = self.registers[a] / 100;
+                    self.memory[self.address_register as usize + 1] = (self.registers[a] / 10) % 10;
+                    self.memory[self.address_register as usize + 2] = self.registers[a] % 10;
+                    Ok(())
+                }
                 0x55 => {
                     let end_index = ((opcode & 0x0F00) >> 8) as usize;
                     debug(&format!("[{:#06X}] dump(V{:X})", opcode, end_index));
@@ -718,6 +726,18 @@ fn test_dxyn_draw_2_rows_no_carry() {
 }
 
 #[test]
+fn test_fx33_binary_coded_decimal() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xB] = 109;
+    m.address_register = 0x0F05;
+
+    // store BCD(B)
+    m.execute_opcode(0xFB33).unwrap();
+
+    assert_eq!(&m.memory[0x0F05..0x0F08], [1, 0, 9]);
+}
+
+#[test]
 fn test_fx55_dump_registers_to_memory() {
     let mut m = Machine::new([0; 0x1000]);
     m.registers[0x0] = 0x00;
@@ -765,7 +785,7 @@ fn test_rom() {
     m.program_counter = 0x200;
 
     // TODO Run longer
-    for _ in 0..200 {
+    for _ in 0..1000 {
         m.step().unwrap();
     }
 }
