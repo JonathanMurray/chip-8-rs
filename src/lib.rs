@@ -28,7 +28,7 @@ pub const FONT_SPRITES: [u8; 5 * 16] = [
 const INTERVAL_60_HZ: f64 = 1.0 / 60.0;
 const DEFAULT_CLOCK_INTERVAL: f64 = 1.0 / 500.0;
 
-fn debug(message: &str) {
+fn debug(_message: &str) {
     //println!("{}", message);
 }
 
@@ -143,6 +143,7 @@ impl Machine {
                 self.delay_timer -= 1;
             }
             if self.sound_timer > 0 {
+                // TODO Add sound support
                 self.sound_timer -= 1;
             }
         }
@@ -177,12 +178,10 @@ impl Machine {
                 0x00ee => {
                     debug(&format!("[{:#06X}] return", opcode));
                     self.pop_program_counter();
-                    Ok(())
                 }
                 0x00e0 => {
                     debug(&format!("[{:#06X}] clear screen", opcode));
                     self.display_buffer.clear();
-                    Ok(())
                 }
                 _ => {
                     let address = opcode & 0x0FFF;
@@ -192,21 +191,18 @@ impl Machine {
                     ));
                     self.push_program_counter();
                     self.program_counter = address;
-                    Ok(())
                 }
             },
             0x1000 => {
                 let address = opcode & 0x0FFF;
                 debug(&format!("[{:#06X}] jump: {:#05X}", opcode, address));
                 self.program_counter = address;
-                Ok(())
             }
             0x2000 => {
                 let address = opcode & 0x0FFF;
                 debug(&format!("[{:#06X}] call: {:#05X}", opcode, address));
                 self.push_program_counter();
                 self.program_counter = address;
-                Ok(())
             }
             0x3000 => {
                 let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -218,7 +214,6 @@ impl Machine {
                 if self.registers[a] == constant {
                     self.program_counter += 2;
                 }
-                Ok(())
             }
             0x4000 => {
                 let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -230,7 +225,6 @@ impl Machine {
                 if self.registers[a] != constant {
                     self.program_counter += 2;
                 }
-                Ok(())
             }
             0x5000 => {
                 let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -239,14 +233,12 @@ impl Machine {
                 if self.registers[a] == self.registers[b] {
                     self.program_counter += 2;
                 }
-                Ok(())
             }
             0x6000 => {
                 let a = ((opcode & 0x0F00) >> 8) as usize;
                 let constant = (opcode & 0x00FF) as u8;
                 debug(&format!("[{:#06X}] V{:X} = {:#04X}", opcode, a, constant));
                 self.registers[a] = constant;
-                Ok(())
             }
             0x7000 => {
                 let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -254,7 +246,6 @@ impl Machine {
                 debug(&format!("[{:#06X}] V{:X} += {:#04X}", opcode, a, constant));
                 let result = self.registers[a].wrapping_add(constant);
                 self.registers[a] = result;
-                Ok(())
             }
             0x8000 => match opcode & 0x000F {
                 0x0 => {
@@ -262,28 +253,24 @@ impl Machine {
                     let b = ((opcode & 0x00F0) >> 4) as usize;
                     debug(&format!("[{:#06X}] V{:X} = V{:X}", opcode, a, b));
                     self.registers[a] = self.registers[b];
-                    Ok(())
                 }
                 0x1 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     let b = ((opcode & 0x00F0) >> 4) as usize;
                     debug(&format!("[{:#06X}] V{:X} = V{:X} | V{:X}", opcode, a, a, b));
                     self.registers[a] = self.registers[a] | self.registers[b];
-                    Ok(())
                 }
                 0x2 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     let b = ((opcode & 0x00F0) >> 4) as usize;
                     debug(&format!("[{:#06X}] V{:X} = V{:X} & V{:X}", opcode, a, a, b));
                     self.registers[a] = self.registers[a] & self.registers[b];
-                    Ok(())
                 }
                 0x3 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     let b = ((opcode & 0x00F0) >> 4) as usize;
                     debug(&format!("[{:#06X}] V{:X} = V{:X} ^ V{:X}", opcode, a, a, b));
                     self.registers[a] = self.registers[a] ^ self.registers[b];
-                    Ok(())
                 }
                 0x4 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -292,7 +279,6 @@ impl Machine {
                     let result = self.registers[a] as u16 + self.registers[b] as u16;
                     self.registers[a] = (result & 0xFF) as u8;
                     self.registers[0xF] = if result > 0xFF { 1 } else { 0 };
-                    Ok(())
                 }
                 0x5 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -301,14 +287,12 @@ impl Machine {
                     let result = self.registers[a] as i16 - self.registers[b] as i16;
                     self.registers[a] = (result % 0x100i16) as u8;
                     self.registers[0xF] = if result < 0 { 0 } else { 1 };
-                    Ok(())
                 }
                 0x6 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     debug(&format!("[{:#06X}] V{:X} >>= 1", opcode, a));
                     self.registers[0xF] = if self.registers[a] & 1 == 1 { 1 } else { 0 };
                     self.registers[a] >>= 1;
-                    Ok(())
                 }
                 0x7 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -317,7 +301,6 @@ impl Machine {
                     let result = self.registers[b] as i16 - self.registers[a] as i16;
                     self.registers[a] = (result % 0x100i16) as u8;
                     self.registers[0xF] = if result < 0 { 0 } else { 1 };
-                    Ok(())
                 }
                 0xE => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -328,9 +311,8 @@ impl Machine {
                         0
                     };
                     self.registers[a] <<= 1;
-                    Ok(())
                 }
-                _ => Err(format!("Unhandled op-code: {:#06X}", opcode)),
+                _ => return Err(format!("Unhandled op-code: {:#06X}", opcode)),
             },
             0x9000 => {
                 let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -339,19 +321,16 @@ impl Machine {
                 if self.registers[a] != self.registers[b] {
                     self.program_counter += 2;
                 }
-                Ok(())
             }
             0xA000 => {
                 let address = opcode & 0x0FFF;
                 debug(&format!("[{:#06X}] I = {:#04X}", opcode, address));
                 self.address_register = address;
-                Ok(())
             }
             0xB000 => {
                 let address = opcode & 0x0FFF;
                 debug(&format!("[{:#06X}] jump to V0 + {:#04X}", opcode, address));
                 self.program_counter = self.registers[0] as u16 + address;
-                Ok(())
             }
             0xC000 => {
                 let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -362,7 +341,6 @@ impl Machine {
                 ));
                 let rnd = self.random.gen::<u8>();
                 self.registers[a] = rnd & constant;
-                Ok(())
             }
             0xD000 => {
                 let vx = ((opcode & 0x0F00) >> 8) as usize;
@@ -389,7 +367,6 @@ impl Machine {
                     }
                 }
                 self.registers[0xF] = if any_pixel_flip { 1 } else { 0 };
-                Ok(())
             }
             0xE000 => match opcode & 0x00FF {
                 0x9E => {
@@ -399,7 +376,6 @@ impl Machine {
                     if self.pressed_keys[key as usize] {
                         self.program_counter += 2;
                     }
-                    Ok(())
                 }
                 0xA1 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -408,47 +384,40 @@ impl Machine {
                     if !self.pressed_keys[key as usize] {
                         self.program_counter += 2;
                     }
-                    Ok(())
                 }
-                _ => Err(format!("Unhandled op-code: {:#06X}", opcode)),
+                _ => return Err(format!("Unhandled op-code: {:#06X}", opcode)),
             },
             0xF000 => match opcode & 0x00FF {
                 0x07 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     debug(&format!("[{:#06X}] V{:X} = get_delay()", opcode, a));
                     self.registers[a] = self.delay_timer;
-                    Ok(())
                 }
                 0x0A => {
                     let a = ((opcode & 0x0F00) >> 8) as u8;
                     debug(&format!("[{:#06X}] V{:X} = get_key()", opcode, a));
                     self.register_blocking_on_key_press = Some(a);
-                    Ok(())
                 }
                 0x15 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     debug(&format!("[{:#06X}] I = delay_timer(V{:X})", opcode, a));
                     self.delay_timer = self.registers[a];
-                    Ok(())
                 }
                 0x18 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     debug(&format!("[{:#06X}] I = sound_timer(V{:X})", opcode, a));
                     self.sound_timer = self.registers[a];
-                    Ok(())
                 }
                 0x1E => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     debug(&format!("[{:#06X}] I += V{:X}", opcode, a));
                     self.address_register =
                         self.address_register.wrapping_add(self.registers[a] as u16);
-                    Ok(())
                 }
                 0x29 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     debug(&format!("[{:#06X}] I = sprite_addr(V{:X})", opcode, a));
                     self.address_register = self.registers[a] as u16 * 5;
-                    Ok(())
                 }
                 0x33 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -456,7 +425,6 @@ impl Machine {
                     self.memory[self.address_register as usize] = self.registers[a] / 100;
                     self.memory[self.address_register as usize + 1] = (self.registers[a] / 10) % 10;
                     self.memory[self.address_register as usize + 2] = self.registers[a] % 10;
-                    Ok(())
                 }
                 0x55 => {
                     let end_index = ((opcode & 0x0F00) >> 8) as usize;
@@ -464,7 +432,6 @@ impl Machine {
                     for i in 0..end_index + 1 {
                         self.memory[self.address_register as usize + i] = self.registers[i];
                     }
-                    Ok(())
                 }
                 0x65 => {
                     let end_index = ((opcode & 0x0F00) >> 8) as usize;
@@ -472,12 +439,12 @@ impl Machine {
                     for i in 0..end_index + 1 {
                         self.registers[i] = self.memory[self.address_register as usize + i];
                     }
-                    Ok(())
                 }
-                _ => Err(format!("Unhandled op-code: {:#06X}", opcode)),
+                _ => return Err(format!("Unhandled op-code: {:#06X}", opcode)),
             },
-            _ => Err(format!("Unhandled op-code: {:#06X}", opcode)),
+            _ => return Err(format!("Unhandled op-code: {:#06X}", opcode)),
         }
+        return Ok(());
     }
 }
 
