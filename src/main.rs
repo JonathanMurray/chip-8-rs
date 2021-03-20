@@ -1,4 +1,4 @@
-use rust_chip_8::Machine;
+use rust_chip_8::{Machine, FONT_SPRITES};
 use std::fs::File;
 use std::io::Read;
 
@@ -18,12 +18,16 @@ use piston_window::{
 const SCALING: u32 = 8;
 
 fn setup_machine() -> Machine {
-    let mut f = File::open("test_opcode.ch8").expect("Open test file");
+    //let mut f = File::open("test_opcode.ch8").expect("Open test file");
+    let mut f = File::open("Pong (1 player).ch8").expect("Open test file");
     let mut buffer = Vec::new();
     f.read_to_end(&mut buffer).expect("Read from test file");
     let mut memory = [0; 0x1000];
     for (i, b) in buffer.into_iter().enumerate() {
         memory[0x200 + i] = b;
+    }
+    for i in 0..FONT_SPRITES.len() {
+        memory[i] = FONT_SPRITES[i];
     }
     Machine::new(memory)
 }
@@ -52,6 +56,8 @@ fn main() {
     .unwrap();
 
     let mut events = Events::new(EventSettings::new());
+
+    let mut cooldown = 0.0;
 
     while let Some(e) = events.next(&mut window) {
         if let Some(_render_args) = e.render_args() {
@@ -87,6 +93,12 @@ fn main() {
             }
         }
 
-        if let Some(_update_args) = e.update_args() {}
+        if let Some(update_args) = e.update_args() {
+            cooldown -= update_args.dt;
+            if cooldown <= 0.0 {
+                cooldown += 0.01;
+                machine.step().expect("Machine step");
+            }
+        }
     }
 }

@@ -4,6 +4,25 @@ use std::fmt::{Debug, Formatter};
 const SCREEN_WIDTH: u8 = 64;
 const SCREEN_HEIGHT: u8 = 32;
 
+pub const FONT_SPRITES: [u8; 5 * 16] = [
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // "0"
+    0x20, 0x60, 0x20, 0x20, 0x70, // "1"
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // "2"
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // "3"
+    0x90, 0x90, 0xF0, 0x10, 0x10, // "4"
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // "5"
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // "6"
+    0xF0, 0x10, 0x20, 0x40, 0x40, // "7"
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // "8"
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // "9"
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // "A"
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // "B"
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // "C"
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // "D"
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // "E"
+    0xF0, 0x80, 0xF0, 0x80, 0x80, // "F"
+];
+
 fn debug(message: &str) {
     println!("{}", message);
 }
@@ -50,6 +69,8 @@ pub struct Machine {
     stack: [u16; 16],
     stack_pointer: u8,
     pub display_buffer: DisplayBuffer,
+    pub delay_timer: u8,
+    pub sound_timer: u8,
 }
 
 impl Machine {
@@ -62,6 +83,8 @@ impl Machine {
             stack: [0; 16],
             stack_pointer: 0,
             display_buffer: DisplayBuffer::new(),
+            delay_timer: 0,
+            sound_timer: 0,
         }
     }
 
@@ -273,6 +296,30 @@ impl Machine {
                 Ok(())
             }
             0xF000 => match opcode & 0x00FF {
+                0x07 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    debug(&format!("[{:#06X}] V{:X} = get_delay()", opcode, a));
+                    self.registers[a] = self.delay_timer;
+                    Ok(())
+                }
+                0x15 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    debug(&format!("[{:#06X}] I = delay_timer(V{:X})", opcode, a));
+                    self.delay_timer = self.registers[a];
+                    Ok(())
+                }
+                0x18 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    debug(&format!("[{:#06X}] I = sound_timer(V{:X})", opcode, a));
+                    self.sound_timer = self.registers[a];
+                    Ok(())
+                }
+                0x29 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    debug(&format!("[{:#06X}] I = sprite_addr(V{:X})", opcode, a));
+                    self.address_register = self.registers[a] as u16 * 5;
+                    Ok(())
+                }
                 0x33 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
                     debug(&format!("[{:#06X}] BCD(V{:X})", opcode, a));
@@ -723,6 +770,64 @@ fn test_dxyn_draw_2_rows_no_carry() {
         );
     }
     assert_eq!(m.registers[0xF], 0)
+}
+
+#[test]
+fn test_fx07_set_vx_to_delay_timer() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0x5] = 37;
+    m.delay_timer = 99;
+
+    // V5 = get_delay()
+    m.execute_opcode(0xF507).unwrap();
+
+    assert_eq!(m.delay_timer, 99);
+}
+
+#[test]
+fn test_fx15_set_delay_timer_to_vx() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0x5] = 37;
+
+    // delay_timer(V5)
+    m.execute_opcode(0xF515).unwrap();
+
+    assert_eq!(m.delay_timer, 37);
+}
+
+#[test]
+fn test_fx18_set_sound_timer_to_vx() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0x4] = 100;
+
+    // sound_timer(V4)
+    m.execute_opcode(0xF418).unwrap();
+
+    assert_eq!(m.sound_timer, 100);
+}
+
+#[test]
+fn test_fx29_set_i_to_font_sprite_address_0() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xB] = 0x0;
+    m.address_register = 0x0F05;
+
+    // I = sprite_addr(VB)
+    m.execute_opcode(0xFB29).unwrap();
+
+    assert_eq!(m.address_register, 5 * 0x0);
+}
+
+#[test]
+fn test_fx29_set_i_to_font_sprite_address_f() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.registers[0xC] = 0xF;
+    m.address_register = 0x0F05;
+
+    // I = sprite_addr(VC)
+    m.execute_opcode(0xFC29).unwrap();
+
+    assert_eq!(m.address_register, 5 * 0xF);
 }
 
 #[test]
