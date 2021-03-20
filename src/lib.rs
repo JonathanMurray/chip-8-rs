@@ -26,7 +26,7 @@ pub const FONT_SPRITES: [u8; 5 * 16] = [
 ];
 
 const INTERVAL_60_HZ: f64 = 1.0 / 60.0;
-const INTERVAL_500_HZ: f64 = 1.0 / 4500.0;
+const DEFAULT_CLOCK_INTERVAL: f64 = 1.0 / 500.0;
 
 fn debug(message: &str) {
     //println!("{}", message);
@@ -91,6 +91,7 @@ pub struct Machine {
     pub pressed_keys: [bool; 16],
     cycle_cooldown: f64,
     register_blocking_on_key_press: Option<u8>,
+    clock_frequency_interval: f64,
 }
 
 impl Machine {
@@ -110,6 +111,7 @@ impl Machine {
             pressed_keys: [false; 16],
             cycle_cooldown: 0.0,
             register_blocking_on_key_press: None,
+            clock_frequency_interval: DEFAULT_CLOCK_INTERVAL,
         }
     }
 
@@ -123,10 +125,14 @@ impl Machine {
         }
     }
 
+    pub fn set_clock_frequency(&mut self, frequency: i32) {
+        self.clock_frequency_interval = 1.0 / frequency as f64;
+    }
+
     pub fn update(&mut self, elapsed_time: f64) -> Result<(), String> {
         self.cycle_cooldown -= elapsed_time;
         while self.cycle_cooldown <= 0.0 {
-            self.cycle_cooldown += INTERVAL_500_HZ;
+            self.cycle_cooldown += self.clock_frequency_interval;
             self.step()?;
         }
 
@@ -825,7 +831,7 @@ fn test_bnnn_jump_to_v0_plus_constant() {
     let mut m = Machine::new([0; 0x1000]);
     m.registers[0] = 0x33;
 
-    // jump to V0 + 0x345 
+    // jump to V0 + 0x345
     m.execute_opcode(0xB345).unwrap();
 
     assert_eq!(m.program_counter, 0x378);

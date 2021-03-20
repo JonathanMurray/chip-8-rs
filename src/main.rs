@@ -18,45 +18,25 @@ use piston_window::{
 
 const SCALING: u32 = 8;
 
-fn setup_machine(filename: &str) -> Machine {
-    let mut f = File::open(filename).expect("Open test file");
-    let mut buffer = Vec::new();
-    f.read_to_end(&mut buffer).expect("Read from test file");
-    let mut memory = [0; 0x1000];
-    for (i, b) in buffer.into_iter().enumerate() {
-        memory[0x200 + i] = b;
-    }
-    for i in 0..FONT_SPRITES.len() {
-        memory[i] = FONT_SPRITES[i];
-    }
-    Machine::new(memory)
-}
-
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let filename;
-    match args.len() {
-        1 => {
-            filename = "Space Invaders [David Winter].ch8";
-        }
-        2 => {
-            filename = &args[1];
-        }
-        _ => {
-            println!("Usage: {} [filename]", args[0]);
-            std::process::exit(1);
-        }
+    let (filename, clock_frequency) = parse_args();
+
+    let mut machine = setup_machine(&filename);
+    let window_title;
+    if let Some(freq) = clock_frequency {
+        machine.set_clock_frequency(freq);
+        println!("Running {} at {} Hz", filename, freq);
+        window_title = format!("{} ({}Hz)", filename, freq);
+    } else {
+        println!("Running {}", filename);
+        window_title = filename;
     }
 
-    println!("Running {}", filename);
-
-    let mut window: PistonWindow = WindowSettings::new("CHIP-8", [64 * SCALING, 32 * SCALING])
+    let mut window: PistonWindow = WindowSettings::new(window_title, [64 * SCALING, 32 * SCALING])
         .graphics_api(OpenGL::V3_2)
         .exit_on_esc(true)
         .build()
         .unwrap();
-
-    let mut machine = setup_machine(&filename);
 
     let raw_image_buf = vec![0; 4 * 64 as usize * 32 as usize];
     let mut image_buffer: ImageBuffer<Rgba<u8>, Vec<u8>> =
@@ -115,6 +95,56 @@ fn main() {
             machine.update(update_args.dt).expect("Machine update");
         }
     }
+}
+
+fn parse_args() -> (String, Option<i32>) {
+    let mut args: Vec<String> = env::args().collect();
+    let filename: String;
+    let mut clock_frequency = None;
+    match args.len() {
+        1 => {
+            filename = "Space Invaders [David Winter].ch8".to_string();
+        }
+        2 => {
+            filename = args.remove(1);
+        }
+        3 => {
+            filename = args.remove(1);
+            let clock_frequency_arg = &args[1];
+            match clock_frequency_arg.parse::<i32>() {
+                Ok(freq) => {
+                    clock_frequency = Some(freq);
+                }
+                Err(err) => {
+                    println!(
+                        "Invalid non-integer clock frequency: {} ({})",
+                        clock_frequency_arg, err
+                    );
+                    println!("Usage: {} [ filename [clock_frequency] ]", args[0]);
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => {
+            println!("Usage: {} [ filename [clock_frequency] ]", args[0]);
+            std::process::exit(1);
+        }
+    }
+    (filename, clock_frequency)
+}
+
+fn setup_machine(filename: &str) -> Machine {
+    let mut f = File::open(filename).expect("Opening ROM file");
+    let mut buffer = Vec::new();
+    f.read_to_end(&mut buffer).expect("Reading from ROM file");
+    let mut memory = [0; 0x1000];
+    for (i, b) in buffer.into_iter().enumerate() {
+        memory[0x200 + i] = b;
+    }
+    for i in 0..FONT_SPRITES.len() {
+        memory[i] = FONT_SPRITES[i];
+    }
+    Machine::new(memory)
 }
 
 fn handle_key(machine: &mut Machine, key: Key, pressed: bool) {
