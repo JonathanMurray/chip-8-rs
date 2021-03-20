@@ -1,3 +1,5 @@
+use rand::rngs::StdRng;
+use rand::{Rng, RngCore, SeedableRng};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 
@@ -23,8 +25,11 @@ pub const FONT_SPRITES: [u8; 5 * 16] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // "F"
 ];
 
+const INTERVAL_60_HZ: f64 = 1.0 / 60.0;
+const INTERVAL_500_HZ: f64 = 1.0 / 500.0;
+
 fn debug(message: &str) {
-    println!("{}", message);
+    //println!("{}", message);
 }
 
 pub struct DisplayBuffer(pub [bool; SCREEN_WIDTH as usize * SCREEN_HEIGHT as usize]);
@@ -35,11 +40,15 @@ impl DisplayBuffer {
     }
 
     fn flip_pixel(&mut self, x: u8, y: u8) {
+        let x = x % SCREEN_WIDTH;
+        let y = y % SCREEN_HEIGHT;
         let index = y as usize * SCREEN_WIDTH as usize + x as usize;
         self.0[index] = !self.0[index];
     }
 
     pub fn get_pixel(&self, x: u8, y: u8) -> bool {
+        let x = x % SCREEN_WIDTH;
+        let y = y % SCREEN_HEIGHT;
         let index = y as usize * SCREEN_WIDTH as usize + x as usize;
         self.0[index]
     }
@@ -71,6 +80,10 @@ pub struct Machine {
     pub display_buffer: DisplayBuffer,
     pub delay_timer: u8,
     pub sound_timer: u8,
+    timer_cooldown: f64,
+    random: Box<dyn RngCore>,
+    pub pressed_keys: [bool; 16],
+    cycle_cooldown: f64,
 }
 
 impl Machine {
@@ -85,7 +98,38 @@ impl Machine {
             display_buffer: DisplayBuffer::new(),
             delay_timer: 0,
             sound_timer: 0,
+            timer_cooldown: 0.0,
+            random: Box::from(StdRng::seed_from_u64(222)),
+            pressed_keys: [false; 16],
+            cycle_cooldown: 0.0,
         }
+    }
+
+    pub fn update(&mut self, elapsed_time: f64) {
+        self.cycle_cooldown -= elapsed_time;
+        while self.cycle_cooldown <= 0.0 {
+            self.cycle_cooldown += INTERVAL_500_HZ;
+            self.step();
+        }
+
+        self.timer_cooldown -= elapsed_time;
+        if self.timer_cooldown <= 0.0 {
+            self.timer_cooldown += INTERVAL_60_HZ;
+            if self.delay_timer > 0 {
+                self.delay_timer -= 1;
+            }
+            if self.sound_timer > 0 {
+                self.sound_timer -= 1;
+            }
+        }
+    }
+
+    fn step(&mut self) -> Result<(), String> {
+        let addr = self.program_counter as usize;
+        debug(&format!("{:#05X}", addr));
+        let opcode = ((self.memory[addr] as u16) << 8) | self.memory[addr + 1] as u16;
+        self.program_counter += 2;
+        self.execute_opcode(opcode)
     }
 
     fn execute_opcode(&mut self, opcode: u16) -> Result<(), String> {
@@ -268,6 +312,17 @@ impl Machine {
                 self.address_register = address;
                 Ok(())
             }
+            0xC000 => {
+                let a = ((opcode & 0x0F00) >> 8) as usize;
+                let constant = (opcode & 0x00FF) as u8;
+                debug(&format!(
+                    "[{:#06X}] V{:#04X} = rand() & {:#04X}",
+                    opcode, a, constant
+                ));
+                let rnd = self.random.gen::<u8>();
+                self.registers[a] = rnd & constant;
+                Ok(())
+            }
             0xD000 => {
                 let vx = ((opcode & 0x0F00) >> 8) as usize;
                 let vy = ((opcode & 0x00F0) >> 4) as usize;
@@ -295,6 +350,27 @@ impl Machine {
                 self.registers[0xF] = if any_pixel_flip { 1 } else { 0 };
                 Ok(())
             }
+            0xE000 => match opcode & 0x00FF {
+                0x9E => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    debug(&format!("[{:#06X}] skip if V{:X} pressed", opcode, a));
+                    let key = self.registers[a];
+                    if self.pressed_keys[key as usize] {
+                        self.program_counter += 2;
+                    }
+                    Ok(())
+                }
+                0xA1 => {
+                    let a = ((opcode & 0x0F00) >> 8) as usize;
+                    debug(&format!("[{:#06X}] skip if V{:X} not pressed", opcode, a));
+                    let key = self.registers[a];
+                    if !self.pressed_keys[key as usize] {
+                        self.program_counter += 2;
+                    }
+                    Ok(())
+                }
+                _ => Err(format!("Unhandled op-code: {:#06X}", opcode)),
+            },
             0xF000 => match opcode & 0x00FF {
                 0x07 => {
                     let a = ((opcode & 0x0F00) >> 8) as usize;
@@ -348,14 +424,6 @@ impl Machine {
             },
             _ => Err(format!("Unhandled op-code: {:#06X}", opcode)),
         }
-    }
-
-    pub fn step(&mut self) -> Result<(), String> {
-        let addr = self.program_counter as usize;
-        debug(&format!("{:#05X}", addr));
-        let opcode = ((self.memory[addr] as u16) << 8) | self.memory[addr + 1] as u16;
-        self.program_counter += 2;
-        self.execute_opcode(opcode)
     }
 }
 
@@ -707,6 +775,18 @@ fn test_annn_set_address_register() {
 }
 
 #[test]
+fn test_cxnn_set_vx_to_random() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.address_register = 100;
+    m.random = Box::from(StdRng::seed_from_u64(222));
+
+    // V3 = rand() & 0b11110010
+    m.execute_opcode(0xC3F2).unwrap();
+
+    assert_eq!(m.registers[0x3], 0b11100000);
+}
+
+#[test]
 fn test_dxyn_draw_1_row_no_carry() {
     let mut m = Machine::new([0; 0x1000]);
     m.address_register = 100;
@@ -770,6 +850,32 @@ fn test_dxyn_draw_2_rows_no_carry() {
         );
     }
     assert_eq!(m.registers[0xF], 0)
+}
+
+#[test]
+fn test_ex9e_skip_if_vx_pressed_true() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.program_counter = 20;
+    m.pressed_keys[0xB] = true;
+    m.registers[0x7] = 0xB;
+
+    // Skip of V7 pressed
+    m.execute_opcode(0xE79E).unwrap();
+
+    assert_eq!(m.program_counter, 22);
+}
+
+#[test]
+fn test_exa1_skip_if_vx_not_pressed_false() {
+    let mut m = Machine::new([0; 0x1000]);
+    m.program_counter = 20;
+    m.pressed_keys[0xB] = true;
+    m.registers[0x7] = 0xB;
+
+    // Skip of V7 not pressed
+    m.execute_opcode(0xE7A1).unwrap();
+
+    assert_eq!(m.program_counter, 20);
 }
 
 #[test]

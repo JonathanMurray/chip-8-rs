@@ -9,7 +9,7 @@ extern crate piston;
 use image::{ImageBuffer, Rgba};
 use opengl_graphics::OpenGL;
 use piston::event_loop::{EventSettings, Events};
-use piston::input::{PressEvent, RenderEvent, UpdateEvent};
+use piston::input::{PressEvent, ReleaseEvent, RenderEvent, UpdateEvent};
 use piston::window::WindowSettings;
 use piston_window::{
     Button, Filter, G2dTexture, Key, PistonWindow, Texture, TextureContext, TextureSettings,
@@ -57,8 +57,6 @@ fn main() {
 
     let mut events = Events::new(EventSettings::new());
 
-    let mut cooldown = 0.0;
-
     while let Some(e) = events.next(&mut window) {
         if let Some(_render_args) = e.render_args() {
             use crate::graphics::Transformed;
@@ -85,20 +83,41 @@ fn main() {
         }
 
         if let Some(press_args) = e.press_args() {
-            match press_args {
-                Button::Keyboard(Key::Space) => {
-                    machine.step().expect("Machine step");
-                }
-                _ => {}
+            if let Button::Keyboard(key) = press_args {
+                handle_key(&mut machine, key, true);
+            }
+        }
+
+        if let Some(release_args) = e.release_args() {
+            if let Button::Keyboard(key) = release_args {
+                handle_key(&mut machine, key, false);
             }
         }
 
         if let Some(update_args) = e.update_args() {
-            cooldown -= update_args.dt;
-            if cooldown <= 0.0 {
-                cooldown += 0.01;
-                machine.step().expect("Machine step");
-            }
+            machine.update(update_args.dt);
         }
+    }
+}
+
+fn handle_key(machine: &mut Machine, key: Key, pressed: bool) {
+    match key {
+        Key::D0 => machine.pressed_keys[0x0] = pressed,
+        Key::D1 => machine.pressed_keys[0x1] = pressed,
+        Key::D2 => machine.pressed_keys[0x2] = pressed,
+        Key::D3 => machine.pressed_keys[0x3] = pressed,
+        Key::D4 => machine.pressed_keys[0x4] = pressed,
+        Key::D5 => machine.pressed_keys[0x5] = pressed,
+        Key::D6 => machine.pressed_keys[0x6] = pressed,
+        Key::D7 => machine.pressed_keys[0x7] = pressed,
+        Key::D8 => machine.pressed_keys[0x8] = pressed,
+        Key::D9 => machine.pressed_keys[0x9] = pressed,
+        Key::A => machine.pressed_keys[0xA] = pressed,
+        Key::B => machine.pressed_keys[0xB] = pressed,
+        Key::C => machine.pressed_keys[0xC] = pressed,
+        Key::D => machine.pressed_keys[0xD] = pressed,
+        Key::E => machine.pressed_keys[0xE] = pressed,
+        Key::F => machine.pressed_keys[0xF] = pressed,
+        _ => {}
     }
 }
