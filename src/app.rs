@@ -14,17 +14,20 @@ use piston_window::{
 };
 
 const SCALING: u32 = 8;
+const C8_WIDTH: u32 = 64;
+const C8_HEIGHT: u32 = 32;
 
 pub fn run(mut machine: Machine, window_title: &str) {
-    let mut window: PistonWindow = WindowSettings::new(window_title, [64 * SCALING, 32 * SCALING])
+    let mut window: PistonWindow = WindowSettings::new(window_title, [C8_WIDTH * SCALING, C8_HEIGHT * SCALING])
         .graphics_api(OpenGL::V3_2)
         .exit_on_esc(true)
         .build()
         .unwrap();
 
-    let raw_image_buf = vec![0; 4 * 64 as usize * 32 as usize];
+
+    let raw_image_buf = vec![0; 4 * C8_WIDTH as usize * C8_HEIGHT as usize];
     let mut image_buffer: ImageBuffer<Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_raw(64, 32, raw_image_buf).unwrap();
+        ImageBuffer::from_raw(C8_WIDTH, C8_HEIGHT, raw_image_buf).unwrap();
     let mut texture_context = TextureContext {
         factory: window.factory.clone(),
         encoder: window.factory.create_command_buffer().into(),
@@ -42,8 +45,8 @@ pub fn run(mut machine: Machine, window_title: &str) {
         if let Some(_render_args) = e.render_args() {
             use graphics::Transformed;
 
-            for y in 0..32 {
-                for x in 0..64 {
+            for y in 0..C8_HEIGHT as u8 {
+                for x in 0..C8_WIDTH as u8 {
                     if machine.display_buffer.get_pixel(x, y) {
                         image_buffer.put_pixel(x as u32, y as u32, Rgba([255, 255, 255, 255]));
                     } else {
