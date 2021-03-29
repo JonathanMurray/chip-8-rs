@@ -1,29 +1,34 @@
 use crate::machine::Machine;
 
-extern crate graphics;
-extern crate opengl_graphics;
-extern crate piston;
-
+use graphics::text::Text;
 use image::{ImageBuffer, Rgba};
-use opengl_graphics::OpenGL;
 use piston::event_loop::{EventSettings, Events};
 use piston::input::{PressEvent, ReleaseEvent, RenderEvent, UpdateEvent};
 use piston::window::WindowSettings;
 use piston_window::{
     Button, Filter, G2dTexture, Key, PistonWindow, Texture, TextureContext, TextureSettings,
 };
+use std::path::Path;
 
 const SCALING: u32 = 8;
 const C8_WIDTH: u32 = 64;
 const C8_HEIGHT: u32 = 32;
+const DEBUG_MARGIN: u32 = 10;
+const DEBUG_Y_OFFSET: u32 = C8_HEIGHT * SCALING + DEBUG_MARGIN;
+const DEBUG_HEIGHT: u32 = 240;
 
 pub fn run(mut machine: Machine, window_title: &str) {
-    let mut window: PistonWindow = WindowSettings::new(window_title, [C8_WIDTH * SCALING, C8_HEIGHT * SCALING])
-        .graphics_api(OpenGL::V3_2)
-        .exit_on_esc(true)
-        .build()
-        .unwrap();
-
+    let mut window: PistonWindow = WindowSettings::new(
+        window_title,
+        [
+            C8_WIDTH * SCALING,
+            C8_HEIGHT * SCALING + DEBUG_MARGIN + DEBUG_HEIGHT,
+        ],
+    )
+    .exit_on_esc(true)
+    .samples(0)
+    .build()
+    .unwrap();
 
     let raw_image_buf = vec![0; 4 * C8_WIDTH as usize * C8_HEIGHT as usize];
     let mut image_buffer: ImageBuffer<Rgba<u8>, Vec<u8>> =
@@ -38,6 +43,9 @@ pub fn run(mut machine: Machine, window_title: &str) {
         &TextureSettings::new().filter(Filter::Nearest),
     )
     .unwrap();
+
+    let font = "Merchant Copy.ttf";
+    let mut glyphs = window.load_font(font).unwrap();
 
     let mut events = Events::new(EventSettings::new());
 
@@ -57,12 +65,37 @@ pub fn run(mut machine: Machine, window_title: &str) {
 
             texture.update(&mut texture_context, &image_buffer).unwrap();
             window.draw_2d(&e, |c, g, device| {
+
+                graphics::clear([0.3, 0.3, 0.3, 1.0], g);
+
                 texture_context.encoder.flush(device);
                 graphics::image(
                     &texture,
                     c.transform.scale(SCALING as f64, SCALING as f64),
                     g,
                 );
+
+                
+                // We use a scaling-hack to get sharp text, as suggested here
+                // https://github.com/PistonDevelopers/piston/issues/1240#issuecomment-569318143
+                let mut text_transform = c.transform;
+                text_transform = text_transform
+                    .trans(20.0, (DEBUG_Y_OFFSET + 10) as f64)
+                    .scale(0.5, 0.5);
+                for (i, register_value) in machine.registers.iter().enumerate() {
+                    Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
+                        .draw(
+                            &format!("V{:X}: {:#02X}", i, register_value),
+                            &mut glyphs,
+                            &c.draw_state,
+                            text_transform.trans(0.0, (i * 26) as f64),
+                            g,
+                        )
+                        .unwrap();
+                }
+
+                // Apparently we need to flush glyphs before rendering
+                glyphs.factory.encoder.flush(device);
             });
         }
 

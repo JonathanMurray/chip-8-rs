@@ -78,7 +78,7 @@ impl Debug for DisplayBuffer {
 
 pub struct Machine {
     memory: [u8; 0x1000],
-    registers: [u8; 16],
+    pub registers: [u8; 16],
     address_register: u16,
     program_counter: u16,
     stack: [u16; 16],
