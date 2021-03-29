@@ -8,7 +8,6 @@ use piston::window::WindowSettings;
 use piston_window::{
     Button, Filter, G2dTexture, Key, PistonWindow, Texture, TextureContext, TextureSettings,
 };
-use std::path::Path;
 
 const SCALING: u32 = 8;
 const C8_WIDTH: u32 = 64;
@@ -65,7 +64,6 @@ pub fn run(mut machine: Machine, window_title: &str) {
 
             texture.update(&mut texture_context, &image_buffer).unwrap();
             window.draw_2d(&e, |c, g, device| {
-
                 graphics::clear([0.3, 0.3, 0.3, 1.0], g);
 
                 texture_context.encoder.flush(device);
@@ -85,10 +83,65 @@ pub fn run(mut machine: Machine, window_title: &str) {
                 for (i, register_value) in machine.registers.iter().enumerate() {
                     Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
                         .draw(
-                            &format!("V{:X}: {:#02X}", i, register_value),
+                            &format!("V{:X}: {:02X}", i, register_value),
                             &mut glyphs,
                             &c.draw_state,
-                            text_transform.trans(0.0, (i * 26) as f64),
+                            text_transform.trans(0.0, (i * 27) as f64),
+                            g,
+                        )
+                        .unwrap();
+                }
+                text_transform = text_transform.trans(160.0, 0.0);
+                Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
+                    .draw(
+                        &format!("I: {:04X}", machine.address_register),
+                        &mut glyphs,
+                        &c.draw_state,
+                        text_transform,
+                        g,
+                    )
+                    .unwrap();
+                text_transform = text_transform.trans(0.0, 27.0);
+                Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
+                    .draw(
+                        &format!("PC: {:04X}", machine.program_counter),
+                        &mut glyphs,
+                        &c.draw_state,
+                        text_transform,
+                        g,
+                    )
+                    .unwrap();
+                text_transform = text_transform.trans(0.0, 27.0);
+                Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
+                    .draw(
+                        &format!("Delay timer: {:02X}", machine.delay_timer),
+                        &mut glyphs,
+                        &c.draw_state,
+                        text_transform,
+                        g,
+                    )
+                    .unwrap();
+                text_transform = text_transform.trans(0.0, 27.0);
+                Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
+                    .draw(
+                        &format!("Sound timer: {:02X}", machine.sound_timer),
+                        &mut glyphs,
+                        &c.draw_state,
+                        text_transform,
+                        g,
+                    )
+                    .unwrap();
+                text_transform = text_transform.trans(0.0, 27.0);
+                Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
+                    .draw("Stack:", &mut glyphs, &c.draw_state, text_transform, g)
+                    .unwrap();
+                for i in 0..machine.stack_pointer + 1 {
+                    Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
+                        .draw(
+                            &format!("{:04X}", machine.stack[i as usize]),
+                            &mut glyphs,
+                            &c.draw_state,
+                            text_transform.trans(100.0 + i as f64 * 80.0, 0.0),
                             g,
                         )
                         .unwrap();

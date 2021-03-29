@@ -13,7 +13,7 @@ pub const FONT_SPRITES: [u8; 5 * 16] = [
     0xF0, 0x10, 0xF0, 0x10, 0xF0, // "3"
     0x90, 0x90, 0xF0, 0x10, 0x10, // "4"
     0xF0, 0x80, 0xF0, 0x10, 0xF0, // "5"
-    0xF0, 0x80, 0xF0, 0x90, 0xF, // "6"
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // "6"
     0xF0, 0x10, 0x20, 0x40, 0x40, // "7"
     0xF0, 0x90, 0xF0, 0x90, 0xF0, // "8"
     0xF0, 0x90, 0xF0, 0x10, 0xF0, // "9"
@@ -79,13 +79,13 @@ impl Debug for DisplayBuffer {
 pub struct Machine {
     memory: [u8; 0x1000],
     pub registers: [u8; 16],
-    address_register: u16,
-    program_counter: u16,
-    stack: [u16; 16],
-    stack_pointer: u8,
+    pub address_register: u16,
+    pub program_counter: u16,
+    pub stack: [u16; 16],
+    pub stack_pointer: u8,
     pub display_buffer: DisplayBuffer,
-    delay_timer: u8,
-    sound_timer: u8,
+    pub delay_timer: u8,
+    pub sound_timer: u8,
     timer_cooldown: f64,
     random: Box<dyn RngCore>,
     pressed_keys: [bool; 16],
