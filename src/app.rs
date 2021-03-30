@@ -15,16 +15,22 @@ const DEBUG_Y_OFFSET: u32 = C8_HEIGHT as u32 * SCALING as u32 + DEBUG_MARGIN;
 const DEBUG_HEIGHT: u32 = 240;
 
 pub fn run(chip8: Chip8, window_title: &str) -> Result<(), GameError> {
+    let debug = true;
+    let window_width = C8_WIDTH as f32 * SCALING;
+    let window_height;
+    if debug {
+        window_height = C8_HEIGHT as f32 * SCALING + DEBUG_MARGIN as f32 + DEBUG_HEIGHT as f32;
+    } else {
+        window_height = C8_HEIGHT as f32 * SCALING;
+    }
     let (mut ctx, mut event_loop) = ContextBuilder::new("ggez_test", "jm")
         .window_setup(WindowSetup::default().title(window_title))
-        .window_mode(WindowMode::default().dimensions(
-            C8_WIDTH as f32 * SCALING,
-            C8_HEIGHT as f32 * SCALING + DEBUG_MARGIN as f32 + DEBUG_HEIGHT as f32,
-        ))
+        .window_mode(WindowMode::default().dimensions(window_width, window_height))
         .add_resource_path(".")
         .build()
         .expect("Creating ggez context");
-    let mut app = App::new(&mut ctx, chip8)?;
+
+    let mut app = App::new(&mut ctx, chip8, debug)?;
     event::run(&mut ctx, &mut event_loop, &mut app)
 }
 
@@ -32,58 +38,23 @@ struct App {
     font: Font,
     image_buffer: [u8; 4 * C8_WIDTH as usize * C8_HEIGHT as usize],
     chip8: Chip8,
+    debug: bool,
 }
 
 impl App {
-    pub fn new(ctx: &mut Context, chip8: Chip8) -> GameResult<App> {
+    pub fn new(ctx: &mut Context, chip8: Chip8, debug: bool) -> GameResult<App> {
         let font = Font::new(ctx, "/Merchant Copy.ttf")?;
         let image_buffer = [255; 4 * C8_WIDTH as usize * C8_HEIGHT as usize];
-        let ggez_test = App {
+        let app = App {
             font: font,
             image_buffer: image_buffer,
             chip8: chip8,
+            debug: debug,
         };
-        Ok(ggez_test)
-    }
-}
-
-impl EventHandler for App {
-    fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
-        let dt = timer::delta(ctx).as_secs_f64();
-
-        self.chip8.update(dt).expect("chip8 update");
-
-        Ok(())
+        Ok(app)
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
-        graphics::clear(ctx, graphics::Color::from_rgb(120, 120, 120));
-
-        for y in 0..C8_HEIGHT {
-            for x in 0..C8_WIDTH {
-                let offset = 4 * (y as usize * C8_WIDTH as usize + x as usize);
-                if self.chip8.display_buffer.get_pixel(x, y) {
-                    self.image_buffer[offset] = 255;
-                    self.image_buffer[offset + 1] = 255;
-                    self.image_buffer[offset + 2] = 255;
-                } else {
-                    self.image_buffer[offset] = 0;
-                    self.image_buffer[offset + 1] = 0;
-                    self.image_buffer[offset + 2] = 0;
-                }
-            }
-        }
-
-        let mut image =
-            Image::from_rgba8(ctx, C8_WIDTH as u16, C8_HEIGHT as u16, &self.image_buffer)?;
-        image.set_filter(FilterMode::Nearest);
-
-        graphics::draw(
-            ctx,
-            &image,
-            DrawParam::default().scale([SCALING as f32, SCALING as f32]),
-        )?;
-
+    fn draw_debug_area(&mut self, ctx: &mut Context) -> GameResult<()> {
         let font_size = 12.5;
         let line_height = 14.5;
 
@@ -161,6 +132,51 @@ impl EventHandler for App {
                 y: DEBUG_Y_OFFSET as f32 + line_height * 4.0,
             };
             graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+        }
+
+        Ok(())
+    }
+}
+
+impl EventHandler for App {
+    fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
+        let dt = timer::delta(ctx).as_secs_f64();
+
+        self.chip8.update(dt).expect("chip8 update");
+
+        Ok(())
+    }
+
+    fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
+        graphics::clear(ctx, graphics::Color::from_rgb(120, 120, 120));
+
+        for y in 0..C8_HEIGHT {
+            for x in 0..C8_WIDTH {
+                let offset = 4 * (y as usize * C8_WIDTH as usize + x as usize);
+                if self.chip8.display_buffer.get_pixel(x, y) {
+                    self.image_buffer[offset] = 255;
+                    self.image_buffer[offset + 1] = 255;
+                    self.image_buffer[offset + 2] = 255;
+                } else {
+                    self.image_buffer[offset] = 0;
+                    self.image_buffer[offset + 1] = 0;
+                    self.image_buffer[offset + 2] = 0;
+                }
+            }
+        }
+
+        let mut image =
+            Image::from_rgba8(ctx, C8_WIDTH as u16, C8_HEIGHT as u16, &self.image_buffer)?;
+        image.set_filter(FilterMode::Nearest);
+
+        graphics::draw(
+            ctx,
+            &image,
+            DrawParam::default().scale([SCALING as f32, SCALING as f32]),
+        )?;
+
+        if self.debug {
+            self.draw_debug_area(ctx)?;
         }
 
         graphics::present(ctx)
