@@ -134,6 +134,17 @@ impl App {
             graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
         }
 
+        let text = Text::new((
+            format!("Clock frequency: {}", self.chip8.clock_frequency()),
+            self.font,
+            font_size,
+        ));
+        let text_pos = Point2 {
+            x: 80.0,
+            y: DEBUG_Y_OFFSET as f32 + line_height * 6.0,
+        };
+        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+
         Ok(())
     }
 }
