@@ -26,7 +26,7 @@ pub const FONT_SPRITES: [u8; 5 * 16] = [
 ];
 
 const INTERVAL_60_HZ: f64 = 1.0 / 60.0;
-const DEFAULT_CLOCK_FREQUENCY: i32 = 500;
+const DEFAULT_CLOCK_FREQUENCY: u32 = 500;
 
 fn debug(_message: &str) {
     //println!("{}", message);
@@ -91,7 +91,7 @@ pub struct Chip8 {
     pressed_keys: [bool; 16],
     cycle_cooldown: f64,
     register_blocking_on_key_press: Option<u8>,
-    clock_frequency: i32,
+    clock_frequency: u32,
     clock_frequency_interval: f64,
 }
 
@@ -127,12 +127,30 @@ impl Chip8 {
         }
     }
 
-    pub fn set_clock_frequency(&mut self, frequency: i32) {
+    pub fn set_clock_frequency(&mut self, frequency: u32) {
         self.clock_frequency = frequency;
         self.clock_frequency_interval = 1.0 / frequency as f64;
     }
 
-    pub fn clock_frequency(&self) -> i32 {
+    pub fn multiply_clock_frequency(&mut self, multiplier: f32) {
+        let freq = self.clock_frequency as f32 * multiplier;
+        let max_frequency = 500_000;
+        if freq < 1.0 {
+            self.set_clock_frequency(1);
+        } else if freq >= max_frequency as f32 {
+            self.set_clock_frequency(max_frequency);
+        } else {
+            if freq as u32 != self.clock_frequency {
+                self.set_clock_frequency(freq as u32);
+            } else if multiplier < 1.0 {
+                self.set_clock_frequency(self.clock_frequency - 1);
+            } else if multiplier > 1.0 {
+                self.set_clock_frequency(self.clock_frequency + 1);
+            }
+        }
+    }
+
+    pub fn clock_frequency(&self) -> u32 {
         self.clock_frequency
     }
 

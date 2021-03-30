@@ -204,20 +204,23 @@ impl EventHandler for App {
         repeat: bool,
     ) {
         if !repeat {
-            handle_key(&mut self.chip8, keycode, true);
+            c8_handle_key(&mut self.chip8, keycode, true);
 
-            if keycode == KeyCode::Escape {
-                ggez::event::quit(ctx);
+            match keycode {
+                KeyCode::Escape => ggez::event::quit(ctx),
+                KeyCode::P => self.chip8.multiply_clock_frequency(1.25),
+                KeyCode::O => self.chip8.multiply_clock_frequency(0.8),
+                _ => println!("Pressed: {:?}", keycode),
             }
         }
     }
 
     fn key_up_event(&mut self, _ctx: &mut Context, keycode: KeyCode, _keymod: KeyMods) {
-        handle_key(&mut self.chip8, keycode, false);
+        c8_handle_key(&mut self.chip8, keycode, false);
     }
 }
 
-fn handle_key(chip8: &mut Chip8, keycode: KeyCode, pressed: bool) {
+fn c8_handle_key(chip8: &mut Chip8, keycode: KeyCode, pressed: bool) {
     match keycode {
         KeyCode::Key0 => chip8.handle_key_event(0x0, pressed),
         KeyCode::Key1 => chip8.handle_key_event(0x1, pressed),

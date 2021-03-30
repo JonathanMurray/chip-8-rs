@@ -24,7 +24,7 @@ fn main() {
     app::run(chip8, &window_title).expect("Run app");
 }
 
-fn parse_args() -> (String, Option<i32>) {
+fn parse_args() -> (String, Option<u32>) {
     let mut args: Vec<String> = env::args().collect();
     let filename: String;
     let mut clock_frequency = None;
@@ -38,7 +38,7 @@ fn parse_args() -> (String, Option<i32>) {
         3 => {
             filename = args.remove(1);
             let clock_frequency_arg = &args[1];
-            match clock_frequency_arg.parse::<i32>() {
+            match clock_frequency_arg.parse::<u32>() {
                 Ok(freq) => {
                     clock_frequency = Some(freq);
                 }
