@@ -76,7 +76,7 @@ impl Debug for DisplayBuffer {
     }
 }
 
-pub struct Machine {
+pub struct Chip8 {
     memory: [u8; 0x1000],
     pub registers: [u8; 16],
     pub address_register: u16,
@@ -94,9 +94,9 @@ pub struct Machine {
     clock_frequency_interval: f64,
 }
 
-impl Machine {
-    pub fn new(memory: [u8; 0x1000]) -> Machine {
-        Machine {
+impl Chip8 {
+    pub fn new(memory: [u8; 0x1000]) -> Chip8 {
+        Chip8 {
             memory: memory,
             registers: [0; 16],
             address_register: 0,
@@ -448,9 +448,9 @@ impl Machine {
     }
 }
 
-impl Debug for Machine {
+impl Debug for Chip8 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("Machine")
+        f.debug_struct("Chip8")
             .field("registers", &self.registers)
             .field("address_register", &self.address_register)
             .field("program_counter", &self.program_counter)
@@ -461,7 +461,7 @@ impl Debug for Machine {
 #[test]
 fn test_0nnn_call() {
     // TODO should this call be handled differently from normal calls?
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.program_counter = 0x987;
 
     // Call machine code routine at 0x234
@@ -477,7 +477,7 @@ fn test_0nnn_call() {
 
 #[test]
 fn test_00ee_return() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.program_counter = 0x987;
     m.stack[0] = 0x123;
     m.stack_pointer = 1;
@@ -491,7 +491,7 @@ fn test_00ee_return() {
 
 #[test]
 fn test_1nnn_jump() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
 
     // Jump to 0x567
     m.execute_opcode(0x1567).unwrap();
@@ -501,7 +501,7 @@ fn test_1nnn_jump() {
 
 #[test]
 fn test_2nnn_call() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.program_counter = 0x153;
 
     // Call subroutine at 0xA05
@@ -517,7 +517,7 @@ fn test_2nnn_call() {
 
 #[test]
 fn test_3xnn_skip_if_eq() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.program_counter = 5;
     m.registers[5] = 0xFF;
 
@@ -529,7 +529,7 @@ fn test_3xnn_skip_if_eq() {
 
 #[test]
 fn test_4xnn_skip_if_not_eq() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.program_counter = 5;
     m.registers[5] = 0xEA;
 
@@ -541,7 +541,7 @@ fn test_4xnn_skip_if_not_eq() {
 
 #[test]
 fn test_5xy0_skip_if_registers_eq() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.program_counter = 5;
     m.registers[0x2] = 0x99;
     m.registers[0xA] = 0x99;
@@ -554,7 +554,7 @@ fn test_5xy0_skip_if_registers_eq() {
 
 #[test]
 fn test_6xnn_set_register() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
 
     // V3 = 0xA2
     m.execute_opcode(0x63A2).unwrap();
@@ -564,7 +564,7 @@ fn test_6xnn_set_register() {
 
 #[test]
 fn test_7xnn_add_to_register() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xB] = 0xF0;
 
     // VB += 0x05
@@ -575,7 +575,7 @@ fn test_7xnn_add_to_register() {
 
 #[test]
 fn test_7xnn_add_to_register_overflow() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xB] = 0xFF;
 
     // VB += 0x35
@@ -586,7 +586,7 @@ fn test_7xnn_add_to_register_overflow() {
 
 #[test]
 fn test_8xy0_set_vx_to_vy() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0x2] = 0x75;
     m.registers[0xA] = 0x99;
 
@@ -599,7 +599,7 @@ fn test_8xy0_set_vx_to_vy() {
 
 #[test]
 fn test_8xy1_set_vx_to_vx_or_vy() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0x2] = 0b0100_1111;
     m.registers[0xA] = 0b0110_0100;
 
@@ -612,7 +612,7 @@ fn test_8xy1_set_vx_to_vx_or_vy() {
 
 #[test]
 fn test_8xy2_set_vx_to_vx_and_vy() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0x2] = 0b0100_1111;
     m.registers[0xA] = 0b0110_0100;
 
@@ -625,7 +625,7 @@ fn test_8xy2_set_vx_to_vx_and_vy() {
 
 #[test]
 fn test_8xy3_set_vx_to_vx_xor_vy() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0x2] = 0b0100_1111;
     m.registers[0xA] = 0b0110_0100;
 
@@ -638,7 +638,7 @@ fn test_8xy3_set_vx_to_vx_xor_vy() {
 
 #[test]
 fn test_8xy4_add_vy_to_vx() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xF] = 3;
     m.registers[0x6] = 53;
     m.registers[0x0] = 22;
@@ -652,7 +652,7 @@ fn test_8xy4_add_vy_to_vx() {
 
 #[test]
 fn test_8xy4_add_vy_to_vx_carry() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xF] = 3;
     m.registers[0x6] = 0xFF;
     m.registers[0x0] = 22;
@@ -666,7 +666,7 @@ fn test_8xy4_add_vy_to_vx_carry() {
 
 #[test]
 fn test_8xy5_subtract_vy_from_vx() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xF] = 3;
     m.registers[0x6] = 110;
     m.registers[0x0] = 60;
@@ -680,7 +680,7 @@ fn test_8xy5_subtract_vy_from_vx() {
 
 #[test]
 fn test_8xy5_subtract_vy_from_vx_borrow() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xF] = 3;
     m.registers[0x6] = 60;
     m.registers[0x0] = 110;
@@ -694,7 +694,7 @@ fn test_8xy5_subtract_vy_from_vx_borrow() {
 
 #[test]
 fn test_8xy6_shift_right() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xF] = 3;
     m.registers[0x2] = 0b01011110;
 
@@ -707,7 +707,7 @@ fn test_8xy6_shift_right() {
 
 #[test]
 fn test_8xy6_shift_right_carry() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xF] = 3;
     m.registers[0x2] = 0b01011101;
 
@@ -720,7 +720,7 @@ fn test_8xy6_shift_right_carry() {
 
 #[test]
 fn test_8xy7_set_vx_to_vy_minus_vx() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xF] = 3;
     m.registers[0x6] = 60;
     m.registers[0x0] = 110;
@@ -734,7 +734,7 @@ fn test_8xy7_set_vx_to_vy_minus_vx() {
 
 #[test]
 fn test_8xy7_set_vx_to_vy_minus_vx_borrow() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xF] = 3;
     m.registers[0x6] = 110;
     m.registers[0x0] = 60;
@@ -748,7 +748,7 @@ fn test_8xy7_set_vx_to_vy_minus_vx_borrow() {
 
 #[test]
 fn test_8xye_shift_left() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xF] = 3;
     m.registers[0x2] = 0b01011101;
 
@@ -761,7 +761,7 @@ fn test_8xye_shift_left() {
 
 #[test]
 fn test_8xye_shift_left_carry() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xF] = 3;
     m.registers[0x2] = 0b10011101;
 
@@ -774,7 +774,7 @@ fn test_8xye_shift_left_carry() {
 
 #[test]
 fn test_9xy0_skip_if_registers_not_eq() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.program_counter = 5;
     m.registers[0x2] = 0x75;
     m.registers[0xA] = 0x99;
@@ -787,7 +787,7 @@ fn test_9xy0_skip_if_registers_not_eq() {
 
 #[test]
 fn test_annn_set_address_register() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
 
     // I = 0xF38
     m.execute_opcode(0xAF38).unwrap();
@@ -797,7 +797,7 @@ fn test_annn_set_address_register() {
 
 #[test]
 fn test_bnnn_jump_to_v0_plus_constant() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0] = 0x33;
 
     // jump to V0 + 0x345
@@ -808,7 +808,7 @@ fn test_bnnn_jump_to_v0_plus_constant() {
 
 #[test]
 fn test_cxnn_set_vx_to_random() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.address_register = 100;
     m.random = Box::from(StdRng::seed_from_u64(222));
 
@@ -820,7 +820,7 @@ fn test_cxnn_set_vx_to_random() {
 
 #[test]
 fn test_dxyn_draw_1_row_no_carry() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.address_register = 100;
     m.memory[m.address_register as usize] = 0b1010_0001;
     m.registers[0xF] = 7;
@@ -839,7 +839,7 @@ fn test_dxyn_draw_1_row_no_carry() {
 
 #[test]
 fn test_dxyn_draw_1_row_carry() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.address_register = 100;
     m.memory[m.address_register as usize] = 0b1010_0001;
     m.registers[0xF] = 7;
@@ -859,7 +859,7 @@ fn test_dxyn_draw_1_row_carry() {
 
 #[test]
 fn test_dxyn_draw_2_rows_no_carry() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.address_register = 100;
     m.memory[m.address_register as usize] = 0b1010_0001;
     m.memory[(m.address_register + 1) as usize] = 0b0011_1100;
@@ -886,7 +886,7 @@ fn test_dxyn_draw_2_rows_no_carry() {
 
 #[test]
 fn test_ex9e_skip_if_vx_pressed_true() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.program_counter = 20;
     m.pressed_keys[0xB] = true;
     m.registers[0x7] = 0xB;
@@ -899,7 +899,7 @@ fn test_ex9e_skip_if_vx_pressed_true() {
 
 #[test]
 fn test_exa1_skip_if_vx_not_pressed_false() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.program_counter = 20;
     m.pressed_keys[0xB] = true;
     m.registers[0x7] = 0xB;
@@ -912,7 +912,7 @@ fn test_exa1_skip_if_vx_not_pressed_false() {
 
 #[test]
 fn test_fx07_set_vx_to_delay_timer() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0x5] = 37;
     m.delay_timer = 99;
 
@@ -924,7 +924,7 @@ fn test_fx07_set_vx_to_delay_timer() {
 
 #[test]
 fn test_fx0a_wait_for_key_press() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
 
     // V8 = get_key()
     m.execute_opcode(0xF80A).unwrap();
@@ -934,7 +934,7 @@ fn test_fx0a_wait_for_key_press() {
 
 #[test]
 fn test_fx15_set_delay_timer_to_vx() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0x5] = 37;
 
     // delay_timer(V5)
@@ -945,7 +945,7 @@ fn test_fx15_set_delay_timer_to_vx() {
 
 #[test]
 fn test_fx18_set_sound_timer_to_vx() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0x4] = 100;
 
     // sound_timer(V4)
@@ -956,7 +956,7 @@ fn test_fx18_set_sound_timer_to_vx() {
 
 #[test]
 fn test_fx1e_add_vx_to_i() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.address_register = 5;
     m.registers[0x2] = 3;
 
@@ -968,7 +968,7 @@ fn test_fx1e_add_vx_to_i() {
 
 #[test]
 fn test_fx29_set_i_to_font_sprite_address_0() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xB] = 0x0;
     m.address_register = 0x0F05;
 
@@ -980,7 +980,7 @@ fn test_fx29_set_i_to_font_sprite_address_0() {
 
 #[test]
 fn test_fx29_set_i_to_font_sprite_address_f() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xC] = 0xF;
     m.address_register = 0x0F05;
 
@@ -992,7 +992,7 @@ fn test_fx29_set_i_to_font_sprite_address_f() {
 
 #[test]
 fn test_fx33_binary_coded_decimal() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0xB] = 109;
     m.address_register = 0x0F05;
 
@@ -1004,7 +1004,7 @@ fn test_fx33_binary_coded_decimal() {
 
 #[test]
 fn test_fx55_dump_registers_to_memory() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0x0] = 0x00;
     m.registers[0x1] = 0x12;
     m.registers[0x2] = 0x34;
@@ -1019,7 +1019,7 @@ fn test_fx55_dump_registers_to_memory() {
 
 #[test]
 fn test_fx65_load_memory_into_registers() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.registers[0x0] = 0x77;
     m.registers[0x1] = 0x77;
     m.registers[0x2] = 0x77;
@@ -1038,7 +1038,7 @@ fn test_fx65_load_memory_into_registers() {
 
 #[test]
 fn test_blocking_on_key_press_prevents_execution() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.register_blocking_on_key_press = Some(0x3);
     m.program_counter = 5;
 
@@ -1049,7 +1049,7 @@ fn test_blocking_on_key_press_prevents_execution() {
 
 #[test]
 fn test_receiving_key_press_while_blocking() {
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     m.register_blocking_on_key_press = Some(0x3);
 
     m.handle_key_event(0x8, true);
@@ -1065,7 +1065,7 @@ fn test_rom() {
     let mut f = File::open("test_opcode.ch8").expect("Open test file");
     let mut buffer = Vec::new();
     f.read_to_end(&mut buffer).expect("Read from test file");
-    let mut m = Machine::new([0; 0x1000]);
+    let mut m = Chip8::new([0; 0x1000]);
     for (i, b) in buffer.into_iter().enumerate() {
         m.memory[0x200 + i] = b;
     }

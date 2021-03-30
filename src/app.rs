@@ -1,4 +1,4 @@
-use crate::machine::Machine;
+use crate::chip8::Chip8;
 
 use ggez::conf::{WindowMode, WindowSetup};
 use ggez::event::{self, EventHandler, KeyCode, KeyMods};
@@ -14,7 +14,7 @@ const DEBUG_MARGIN: u32 = 10;
 const DEBUG_Y_OFFSET: u32 = C8_HEIGHT as u32 * SCALING as u32 + DEBUG_MARGIN;
 const DEBUG_HEIGHT: u32 = 240;
 
-pub fn run(machine: Machine, window_title: &str) -> Result<(), GameError> {
+pub fn run(chip8: Chip8, window_title: &str) -> Result<(), GameError> {
     let (mut ctx, mut event_loop) = ContextBuilder::new("ggez_test", "jm")
         .window_setup(WindowSetup::default().title(window_title))
         .window_mode(WindowMode::default().dimensions(
@@ -24,24 +24,24 @@ pub fn run(machine: Machine, window_title: &str) -> Result<(), GameError> {
         .add_resource_path(".")
         .build()
         .expect("Creating ggez context");
-    let mut app = App::new(&mut ctx, machine)?;
+    let mut app = App::new(&mut ctx, chip8)?;
     event::run(&mut ctx, &mut event_loop, &mut app)
 }
 
 struct App {
     font: Font,
     image_buffer: [u8; 4 * C8_WIDTH as usize * C8_HEIGHT as usize],
-    machine: Machine,
+    chip8: Chip8,
 }
 
 impl App {
-    pub fn new(ctx: &mut Context, machine: Machine) -> GameResult<App> {
+    pub fn new(ctx: &mut Context, chip8: Chip8) -> GameResult<App> {
         let font = Font::new(ctx, "/Merchant Copy.ttf")?;
         let image_buffer = [255; 4 * C8_WIDTH as usize * C8_HEIGHT as usize];
         let ggez_test = App {
             font: font,
             image_buffer: image_buffer,
-            machine: machine,
+            chip8: chip8,
         };
         Ok(ggez_test)
     }
@@ -51,7 +51,7 @@ impl EventHandler for App {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
         let dt = timer::delta(ctx).as_secs_f64();
 
-        self.machine.update(dt).expect("machine update");
+        self.chip8.update(dt).expect("chip8 update");
 
         Ok(())
     }
@@ -62,7 +62,7 @@ impl EventHandler for App {
         for y in 0..C8_HEIGHT {
             for x in 0..C8_WIDTH {
                 let offset = 4 * (y as usize * C8_WIDTH as usize + x as usize);
-                if self.machine.display_buffer.get_pixel(x, y) {
+                if self.chip8.display_buffer.get_pixel(x, y) {
                     self.image_buffer[offset] = 255;
                     self.image_buffer[offset + 1] = 255;
                     self.image_buffer[offset + 2] = 255;
@@ -87,7 +87,7 @@ impl EventHandler for App {
         let font_size = 12.5;
         let line_height = 14.5;
 
-        for (i, register_value) in self.machine.registers.iter().enumerate() {
+        for (i, register_value) in self.chip8.registers.iter().enumerate() {
             let text = Text::new((
                 format!("V{:X}: {:02X}", i, register_value),
                 self.font,
@@ -101,7 +101,7 @@ impl EventHandler for App {
         }
 
         let text = Text::new((
-            format!("I: {:04X}", self.machine.address_register),
+            format!("I: {:04X}", self.chip8.address_register),
             self.font,
             font_size,
         ));
@@ -112,7 +112,7 @@ impl EventHandler for App {
         graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
 
         let text = Text::new((
-            format!("PC: {:04X}", self.machine.program_counter),
+            format!("PC: {:04X}", self.chip8.program_counter),
             self.font,
             font_size,
         ));
@@ -123,7 +123,7 @@ impl EventHandler for App {
         graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
 
         let text = Text::new((
-            format!("Delay timer: {:02X}", self.machine.delay_timer),
+            format!("Delay timer: {:02X}", self.chip8.delay_timer),
             self.font,
             font_size,
         ));
@@ -134,7 +134,7 @@ impl EventHandler for App {
         graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
 
         let text = Text::new((
-            format!("Sound timer: {:02X}", self.machine.sound_timer),
+            format!("Sound timer: {:02X}", self.chip8.sound_timer),
             self.font,
             font_size,
         ));
@@ -150,9 +150,9 @@ impl EventHandler for App {
             y: DEBUG_Y_OFFSET as f32 + line_height * 4.0,
         };
         graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
-        for i in 0..self.machine.stack_pointer + 1 {
+        for i in 0..self.chip8.stack_pointer + 1 {
             let text = Text::new((
-                format!("{:04X}", self.machine.stack[i as usize]),
+                format!("{:04X}", self.chip8.stack[i as usize]),
                 self.font,
                 font_size,
             ));
@@ -174,7 +174,7 @@ impl EventHandler for App {
         repeat: bool,
     ) {
         if !repeat {
-            handle_key(&mut self.machine, keycode, true);
+            handle_key(&mut self.chip8, keycode, true);
 
             if keycode == KeyCode::Escape {
                 ggez::event::quit(ctx);
@@ -183,28 +183,28 @@ impl EventHandler for App {
     }
 
     fn key_up_event(&mut self, _ctx: &mut Context, keycode: KeyCode, _keymod: KeyMods) {
-        handle_key(&mut self.machine, keycode, false);
+        handle_key(&mut self.chip8, keycode, false);
     }
 }
 
-fn handle_key(machine: &mut Machine, keycode: KeyCode, pressed: bool) {
+fn handle_key(chip8: &mut Chip8, keycode: KeyCode, pressed: bool) {
     match keycode {
-        KeyCode::Key0 => machine.handle_key_event(0x0, pressed),
-        KeyCode::Key1 => machine.handle_key_event(0x1, pressed),
-        KeyCode::Key2 => machine.handle_key_event(0x2, pressed),
-        KeyCode::Key3 => machine.handle_key_event(0x3, pressed),
-        KeyCode::Key4 => machine.handle_key_event(0x4, pressed),
-        KeyCode::Key5 => machine.handle_key_event(0x5, pressed),
-        KeyCode::Key6 => machine.handle_key_event(0x6, pressed),
-        KeyCode::Key7 => machine.handle_key_event(0x7, pressed),
-        KeyCode::Key8 => machine.handle_key_event(0x8, pressed),
-        KeyCode::Key9 => machine.handle_key_event(0x9, pressed),
-        KeyCode::A => machine.handle_key_event(0xA, pressed),
-        KeyCode::B => machine.handle_key_event(0xB, pressed),
-        KeyCode::C => machine.handle_key_event(0xC, pressed),
-        KeyCode::D => machine.handle_key_event(0xD, pressed),
-        KeyCode::E => machine.handle_key_event(0xE, pressed),
-        KeyCode::F => machine.handle_key_event(0xF, pressed),
+        KeyCode::Key0 => chip8.handle_key_event(0x0, pressed),
+        KeyCode::Key1 => chip8.handle_key_event(0x1, pressed),
+        KeyCode::Key2 => chip8.handle_key_event(0x2, pressed),
+        KeyCode::Key3 => chip8.handle_key_event(0x3, pressed),
+        KeyCode::Key4 => chip8.handle_key_event(0x4, pressed),
+        KeyCode::Key5 => chip8.handle_key_event(0x5, pressed),
+        KeyCode::Key6 => chip8.handle_key_event(0x6, pressed),
+        KeyCode::Key7 => chip8.handle_key_event(0x7, pressed),
+        KeyCode::Key8 => chip8.handle_key_event(0x8, pressed),
+        KeyCode::Key9 => chip8.handle_key_event(0x9, pressed),
+        KeyCode::A => chip8.handle_key_event(0xA, pressed),
+        KeyCode::B => chip8.handle_key_event(0xB, pressed),
+        KeyCode::C => chip8.handle_key_event(0xC, pressed),
+        KeyCode::D => chip8.handle_key_event(0xD, pressed),
+        KeyCode::E => chip8.handle_key_event(0xE, pressed),
+        KeyCode::F => chip8.handle_key_event(0xF, pressed),
         _ => {}
     }
 }

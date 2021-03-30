@@ -1,7 +1,7 @@
 mod app;
-mod machine;
+mod chip8;
 
-use machine::{Machine, FONT_SPRITES};
+use chip8::{Chip8, FONT_SPRITES};
 use std::env;
 use std::fs::File;
 use std::io::Read;
@@ -9,11 +9,11 @@ use std::io::Read;
 fn main() {
     let (filename, clock_frequency) = parse_args();
 
-    let mut machine = setup_machine(&filename);
+    let mut chip8 = setup_chip8(&filename);
 
     let window_title;
     if let Some(freq) = clock_frequency {
-        machine.set_clock_frequency(freq);
+        chip8.set_clock_frequency(freq);
         println!("Running {} at {} Hz", filename, freq);
         window_title = format!("{} ({}Hz)", filename, freq);
     } else {
@@ -21,7 +21,7 @@ fn main() {
         window_title = filename;
     }
 
-    app::run(machine, &window_title).expect("Run app");
+    app::run(chip8, &window_title).expect("Run app");
 }
 
 fn parse_args() -> (String, Option<i32>) {
@@ -60,7 +60,7 @@ fn parse_args() -> (String, Option<i32>) {
     (filename, clock_frequency)
 }
 
-fn setup_machine(filename: &str) -> Machine {
+fn setup_chip8(filename: &str) -> Chip8 {
     let mut f = File::open(filename).expect("Opening ROM file");
     let mut buffer = Vec::new();
     f.read_to_end(&mut buffer).expect("Reading from ROM file");
@@ -71,5 +71,5 @@ fn setup_machine(filename: &str) -> Machine {
     for i in 0..FONT_SPRITES.len() {
         memory[i] = FONT_SPRITES[i];
     }
-    Machine::new(memory)
+    Chip8::new(memory)
 }
