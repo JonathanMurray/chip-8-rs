@@ -56,107 +56,82 @@ impl App {
         Ok(app)
     }
 
+    fn draw_text(&self, ctx: &mut Context, s: &str, x: f32, y: f32) -> GameResult<()> {
+        let text = Text::new((s, self.font, 12.5));
+        graphics::draw(ctx, &text, DrawParam::default().dest(Point2 { x: x, y: y }))
+    }
+
     fn draw_debug_area(&mut self, ctx: &mut Context) -> GameResult<()> {
-        let font_size = 12.5;
         let line_height = 14.5;
 
         for (i, register_value) in self.chip8.registers.iter().enumerate() {
-            let text = Text::new((
-                format!("V{:X}: {:02X}", i, register_value),
-                self.font,
-                font_size,
-            ));
-            let text_pos = Point2 {
-                x: 10.0,
-                y: DEBUG_Y_OFFSET as f32 + i as f32 * line_height,
-            };
-            graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+            self.draw_text(
+                ctx,
+                &format!("V{:X}: {:02X}", i, register_value),
+                10.0,
+                DEBUG_Y_OFFSET as f32 + i as f32 * line_height,
+            )?;
         }
 
-        let text = Text::new((
-            format!("I: {:04X}", self.chip8.address_register),
-            self.font,
-            font_size,
-        ));
-        let text_pos = Point2 {
-            x: 80.0,
-            y: DEBUG_Y_OFFSET as f32,
-        };
-        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+        let x = 80.0;
+        let mut y = DEBUG_Y_OFFSET as f32;
+        self.draw_text(
+            ctx,
+            &format!("I: {:04X}", self.chip8.address_register),
+            x,
+            y,
+        )?;
 
-        let text = Text::new((
-            format!("PC: {:04X}", self.chip8.program_counter),
-            self.font,
-            font_size,
-        ));
-        let text_pos = Point2 {
-            x: 80.0,
-            y: DEBUG_Y_OFFSET as f32 + line_height,
-        };
-        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+        y += line_height;
+        self.draw_text(
+            ctx,
+            &format!("PC: {:04X}", self.chip8.program_counter),
+            x,
+            y,
+        )?;
 
-        let text = Text::new((
-            format!("Delay timer: {:02X}", self.chip8.delay_timer),
-            self.font,
-            font_size,
-        ));
-        let text_pos = Point2 {
-            x: 80.0,
-            y: DEBUG_Y_OFFSET as f32 + line_height * 2.0,
-        };
-        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+        y += line_height;
+        self.draw_text(
+            ctx,
+            &format!("Delay timer: {:02X}", self.chip8.delay_timer),
+            x,
+            y,
+        )?;
 
-        let text = Text::new((
-            format!("Sound timer: {:02X}", self.chip8.sound_timer),
-            self.font,
-            font_size,
-        ));
-        let text_pos = Point2 {
-            x: 80.0,
-            y: DEBUG_Y_OFFSET as f32 + line_height * 3.0,
-        };
-        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+        y += line_height;
+        self.draw_text(
+            ctx,
+            &format!("Sound timer: {:02X}", self.chip8.sound_timer),
+            x,
+            y,
+        )?;
 
-        let text = Text::new(("Stack:", self.font, font_size));
-        let text_pos = Point2 {
-            x: 80.0,
-            y: DEBUG_Y_OFFSET as f32 + line_height * 4.0,
-        };
-        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+        y += line_height;
+        self.draw_text(ctx, &"Stack:", x, y)?;
         for i in 0..self.chip8.stack_pointer + 1 {
-            let text = Text::new((
-                format!("{:04X}", self.chip8.stack[i as usize]),
-                self.font,
-                font_size,
-            ));
-            let text_pos = Point2 {
-                x: 130.0 + i as f32 * 40.0,
-                y: DEBUG_Y_OFFSET as f32 + line_height * 4.0,
-            };
-            graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+            self.draw_text(
+                ctx,
+                &format!("{:04X}", self.chip8.stack[i as usize]),
+                x + 50.0 + i as f32 * 40.0,
+                y,
+            )?;
         }
 
-        let text = Text::new((
-            format!("Clock frequency: {}", self.chip8.clock_frequency()),
-            self.font,
-            font_size,
-        ));
-        let text_pos = Point2 {
-            x: 80.0,
-            y: DEBUG_Y_OFFSET as f32 + line_height * 6.0,
-        };
-        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+        y += line_height * 2.0;
+        self.draw_text(
+            ctx,
+            &format!("Clock frequency: {}", self.chip8.clock_frequency()),
+            x,
+            y,
+        )?;
 
-        let text = Text::new((
-            format!("Status: {}", if self.paused { "PAUSED" } else { "RUNNING" }),
-            self.font,
-            font_size,
-        ));
-        let text_pos = Point2 {
-            x: 80.0,
-            y: DEBUG_Y_OFFSET as f32 + line_height * 7.0,
-        };
-        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+        y += line_height;
+        self.draw_text(
+            ctx,
+            &format!("Status: {}", if self.paused { "PAUSED" } else { "RUNNING" }),
+            x,
+            y,
+        )?;
 
         Ok(())
     }
