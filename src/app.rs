@@ -1,193 +1,210 @@
 use crate::machine::Machine;
 
-use graphics::text::Text;
-use image::{ImageBuffer, Rgba};
-use piston::event_loop::{EventSettings, Events};
-use piston::input::{PressEvent, ReleaseEvent, RenderEvent, UpdateEvent};
-use piston::window::WindowSettings;
-use piston_window::{
-    Button, Filter, G2dTexture, Key, PistonWindow, Texture, TextureContext, TextureSettings,
-};
+use ggez::conf::{WindowMode, WindowSetup};
+use ggez::event::{self, EventHandler, KeyCode, KeyMods};
+use ggez::graphics::{self, DrawParam, FilterMode, Font, Image, Text};
+use ggez::timer;
+use ggez::{Context, ContextBuilder, GameError, GameResult};
+use mint::Point2;
 
-const SCALING: u32 = 8;
-const C8_WIDTH: u32 = 64;
-const C8_HEIGHT: u32 = 32;
+const SCALING: f32 = 8.0;
+const C8_WIDTH: u8 = 64;
+const C8_HEIGHT: u8 = 32;
 const DEBUG_MARGIN: u32 = 10;
-const DEBUG_Y_OFFSET: u32 = C8_HEIGHT * SCALING + DEBUG_MARGIN;
+const DEBUG_Y_OFFSET: u32 = C8_HEIGHT as u32 * SCALING as u32 + DEBUG_MARGIN;
 const DEBUG_HEIGHT: u32 = 240;
 
-pub fn run(mut machine: Machine, window_title: &str) {
-    let mut window: PistonWindow = WindowSettings::new(
-        window_title,
-        [
-            C8_WIDTH * SCALING,
-            C8_HEIGHT * SCALING + DEBUG_MARGIN + DEBUG_HEIGHT,
-        ],
-    )
-    .exit_on_esc(true)
-    .samples(0)
-    .build()
-    .unwrap();
+pub fn run(machine: Machine, window_title: &str) -> Result<(), GameError> {
+    let (mut ctx, mut event_loop) = ContextBuilder::new("ggez_test", "jm")
+        .window_setup(WindowSetup::default().title(window_title))
+        .window_mode(WindowMode::default().dimensions(
+            C8_WIDTH as f32 * SCALING,
+            C8_HEIGHT as f32 * SCALING + DEBUG_MARGIN as f32 + DEBUG_HEIGHT as f32,
+        ))
+        .add_resource_path(".")
+        .build()
+        .expect("Creating ggez context");
+    let mut app = App::new(&mut ctx, machine)?;
+    event::run(&mut ctx, &mut event_loop, &mut app)
+}
 
-    let raw_image_buf = vec![0; 4 * C8_WIDTH as usize * C8_HEIGHT as usize];
-    let mut image_buffer: ImageBuffer<Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_raw(C8_WIDTH, C8_HEIGHT, raw_image_buf).unwrap();
-    let mut texture_context = TextureContext {
-        factory: window.factory.clone(),
-        encoder: window.factory.create_command_buffer().into(),
-    };
-    let mut texture: G2dTexture = Texture::from_image(
-        &mut texture_context,
-        &image_buffer,
-        &TextureSettings::new().filter(Filter::Nearest),
-    )
-    .unwrap();
+struct App {
+    font: Font,
+    image_buffer: [u8; 4 * C8_WIDTH as usize * C8_HEIGHT as usize],
+    machine: Machine,
+}
 
-    let font = "Merchant Copy.ttf";
-    let mut glyphs = window.load_font(font).unwrap();
-
-    let mut events = Events::new(EventSettings::new());
-
-    while let Some(e) = events.next(&mut window) {
-        if let Some(_render_args) = e.render_args() {
-            use graphics::Transformed;
-
-            for y in 0..C8_HEIGHT as u8 {
-                for x in 0..C8_WIDTH as u8 {
-                    if machine.display_buffer.get_pixel(x, y) {
-                        image_buffer.put_pixel(x as u32, y as u32, Rgba([255, 255, 255, 255]));
-                    } else {
-                        image_buffer.put_pixel(x as u32, y as u32, Rgba([0, 0, 0, 255]));
-                    }
-                }
-            }
-
-            texture.update(&mut texture_context, &image_buffer).unwrap();
-            window.draw_2d(&e, |c, g, device| {
-                graphics::clear([0.3, 0.3, 0.3, 1.0], g);
-
-                texture_context.encoder.flush(device);
-                graphics::image(
-                    &texture,
-                    c.transform.scale(SCALING as f64, SCALING as f64),
-                    g,
-                );
-
-                
-                // We use a scaling-hack to get sharp text, as suggested here
-                // https://github.com/PistonDevelopers/piston/issues/1240#issuecomment-569318143
-                let mut text_transform = c.transform;
-                text_transform = text_transform
-                    .trans(20.0, (DEBUG_Y_OFFSET + 10) as f64)
-                    .scale(0.5, 0.5);
-                for (i, register_value) in machine.registers.iter().enumerate() {
-                    Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
-                        .draw(
-                            &format!("V{:X}: {:02X}", i, register_value),
-                            &mut glyphs,
-                            &c.draw_state,
-                            text_transform.trans(0.0, (i * 27) as f64),
-                            g,
-                        )
-                        .unwrap();
-                }
-                text_transform = text_transform.trans(160.0, 0.0);
-                Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
-                    .draw(
-                        &format!("I: {:04X}", machine.address_register),
-                        &mut glyphs,
-                        &c.draw_state,
-                        text_transform,
-                        g,
-                    )
-                    .unwrap();
-                text_transform = text_transform.trans(0.0, 27.0);
-                Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
-                    .draw(
-                        &format!("PC: {:04X}", machine.program_counter),
-                        &mut glyphs,
-                        &c.draw_state,
-                        text_transform,
-                        g,
-                    )
-                    .unwrap();
-                text_transform = text_transform.trans(0.0, 27.0);
-                Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
-                    .draw(
-                        &format!("Delay timer: {:02X}", machine.delay_timer),
-                        &mut glyphs,
-                        &c.draw_state,
-                        text_transform,
-                        g,
-                    )
-                    .unwrap();
-                text_transform = text_transform.trans(0.0, 27.0);
-                Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
-                    .draw(
-                        &format!("Sound timer: {:02X}", machine.sound_timer),
-                        &mut glyphs,
-                        &c.draw_state,
-                        text_transform,
-                        g,
-                    )
-                    .unwrap();
-                text_transform = text_transform.trans(0.0, 27.0);
-                Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
-                    .draw("Stack:", &mut glyphs, &c.draw_state, text_transform, g)
-                    .unwrap();
-                for i in 0..machine.stack_pointer + 1 {
-                    Text::new_color([1.0, 1.0, 1.0, 1.0], 20)
-                        .draw(
-                            &format!("{:04X}", machine.stack[i as usize]),
-                            &mut glyphs,
-                            &c.draw_state,
-                            text_transform.trans(100.0 + i as f64 * 80.0, 0.0),
-                            g,
-                        )
-                        .unwrap();
-                }
-
-                // Apparently we need to flush glyphs before rendering
-                glyphs.factory.encoder.flush(device);
-            });
-        }
-
-        if let Some(press_args) = e.press_args() {
-            if let Button::Keyboard(key) = press_args {
-                handle_key(&mut machine, key, true);
-            }
-        }
-
-        if let Some(release_args) = e.release_args() {
-            if let Button::Keyboard(key) = release_args {
-                handle_key(&mut machine, key, false);
-            }
-        }
-
-        if let Some(update_args) = e.update_args() {
-            machine.update(update_args.dt).expect("Machine update");
-        }
+impl App {
+    pub fn new(ctx: &mut Context, machine: Machine) -> GameResult<App> {
+        let font = Font::new(ctx, "/Merchant Copy.ttf")?;
+        let image_buffer = [255; 4 * C8_WIDTH as usize * C8_HEIGHT as usize];
+        let ggez_test = App {
+            font: font,
+            image_buffer: image_buffer,
+            machine: machine,
+        };
+        Ok(ggez_test)
     }
 }
 
-fn handle_key(machine: &mut Machine, key: Key, pressed: bool) {
-    match key {
-        Key::D0 => machine.handle_key_event(0x0, pressed),
-        Key::D1 => machine.handle_key_event(0x1, pressed),
-        Key::D2 => machine.handle_key_event(0x2, pressed),
-        Key::D3 => machine.handle_key_event(0x3, pressed),
-        Key::D4 => machine.handle_key_event(0x4, pressed),
-        Key::D5 => machine.handle_key_event(0x5, pressed),
-        Key::D6 => machine.handle_key_event(0x6, pressed),
-        Key::D7 => machine.handle_key_event(0x7, pressed),
-        Key::D8 => machine.handle_key_event(0x8, pressed),
-        Key::D9 => machine.handle_key_event(0x9, pressed),
-        Key::A => machine.handle_key_event(0xA, pressed),
-        Key::B => machine.handle_key_event(0xB, pressed),
-        Key::C => machine.handle_key_event(0xC, pressed),
-        Key::D => machine.handle_key_event(0xD, pressed),
-        Key::E => machine.handle_key_event(0xE, pressed),
-        Key::F => machine.handle_key_event(0xF, pressed),
+impl EventHandler for App {
+    fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
+        let dt = timer::delta(ctx).as_secs_f64();
+
+        self.machine.update(dt).expect("machine update");
+
+        Ok(())
+    }
+
+    fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
+        graphics::clear(ctx, graphics::Color::from_rgb(120, 120, 120));
+
+        for y in 0..C8_HEIGHT {
+            for x in 0..C8_WIDTH {
+                let offset = 4 * (y as usize * C8_WIDTH as usize + x as usize);
+                if self.machine.display_buffer.get_pixel(x, y) {
+                    self.image_buffer[offset] = 255;
+                    self.image_buffer[offset + 1] = 255;
+                    self.image_buffer[offset + 2] = 255;
+                } else {
+                    self.image_buffer[offset] = 0;
+                    self.image_buffer[offset + 1] = 0;
+                    self.image_buffer[offset + 2] = 0;
+                }
+            }
+        }
+
+        let mut image =
+            Image::from_rgba8(ctx, C8_WIDTH as u16, C8_HEIGHT as u16, &self.image_buffer)?;
+        image.set_filter(FilterMode::Nearest);
+
+        graphics::draw(
+            ctx,
+            &image,
+            DrawParam::default().scale([SCALING as f32, SCALING as f32]),
+        )?;
+
+        let font_size = 12.5;
+        let line_height = 14.5;
+
+        for (i, register_value) in self.machine.registers.iter().enumerate() {
+            let text = Text::new((
+                format!("V{:X}: {:02X}", i, register_value),
+                self.font,
+                font_size,
+            ));
+            let text_pos = Point2 {
+                x: 10.0,
+                y: DEBUG_Y_OFFSET as f32 + i as f32 * line_height,
+            };
+            graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+        }
+
+        let text = Text::new((
+            format!("I: {:04X}", self.machine.address_register),
+            self.font,
+            font_size,
+        ));
+        let text_pos = Point2 {
+            x: 80.0,
+            y: DEBUG_Y_OFFSET as f32,
+        };
+        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+
+        let text = Text::new((
+            format!("PC: {:04X}", self.machine.program_counter),
+            self.font,
+            font_size,
+        ));
+        let text_pos = Point2 {
+            x: 80.0,
+            y: DEBUG_Y_OFFSET as f32 + line_height,
+        };
+        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+
+        let text = Text::new((
+            format!("Delay timer: {:02X}", self.machine.delay_timer),
+            self.font,
+            font_size,
+        ));
+        let text_pos = Point2 {
+            x: 80.0,
+            y: DEBUG_Y_OFFSET as f32 + line_height * 2.0,
+        };
+        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+
+        let text = Text::new((
+            format!("Sound timer: {:02X}", self.machine.sound_timer),
+            self.font,
+            font_size,
+        ));
+        let text_pos = Point2 {
+            x: 80.0,
+            y: DEBUG_Y_OFFSET as f32 + line_height * 3.0,
+        };
+        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+
+        let text = Text::new(("Stack:", self.font, font_size));
+        let text_pos = Point2 {
+            x: 80.0,
+            y: DEBUG_Y_OFFSET as f32 + line_height * 4.0,
+        };
+        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+        for i in 0..self.machine.stack_pointer + 1 {
+            let text = Text::new((
+                format!("{:04X}", self.machine.stack[i as usize]),
+                self.font,
+                font_size,
+            ));
+            let text_pos = Point2 {
+                x: 130.0 + i as f32 * 40.0,
+                y: DEBUG_Y_OFFSET as f32 + line_height * 4.0,
+            };
+            graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+        }
+
+        graphics::present(ctx)
+    }
+
+    fn key_down_event(
+        &mut self,
+        ctx: &mut Context,
+        keycode: KeyCode,
+        _keymod: KeyMods,
+        repeat: bool,
+    ) {
+        if !repeat {
+            handle_key(&mut self.machine, keycode, true);
+
+            if keycode == KeyCode::Escape {
+                ggez::event::quit(ctx);
+            }
+        }
+    }
+
+    fn key_up_event(&mut self, _ctx: &mut Context, keycode: KeyCode, _keymod: KeyMods) {
+        handle_key(&mut self.machine, keycode, false);
+    }
+}
+
+fn handle_key(machine: &mut Machine, keycode: KeyCode, pressed: bool) {
+    match keycode {
+        KeyCode::Key0 => machine.handle_key_event(0x0, pressed),
+        KeyCode::Key1 => machine.handle_key_event(0x1, pressed),
+        KeyCode::Key2 => machine.handle_key_event(0x2, pressed),
+        KeyCode::Key3 => machine.handle_key_event(0x3, pressed),
+        KeyCode::Key4 => machine.handle_key_event(0x4, pressed),
+        KeyCode::Key5 => machine.handle_key_event(0x5, pressed),
+        KeyCode::Key6 => machine.handle_key_event(0x6, pressed),
+        KeyCode::Key7 => machine.handle_key_event(0x7, pressed),
+        KeyCode::Key8 => machine.handle_key_event(0x8, pressed),
+        KeyCode::Key9 => machine.handle_key_event(0x9, pressed),
+        KeyCode::A => machine.handle_key_event(0xA, pressed),
+        KeyCode::B => machine.handle_key_event(0xB, pressed),
+        KeyCode::C => machine.handle_key_event(0xC, pressed),
+        KeyCode::D => machine.handle_key_event(0xD, pressed),
+        KeyCode::E => machine.handle_key_event(0xE, pressed),
+        KeyCode::F => machine.handle_key_event(0xF, pressed),
         _ => {}
     }
 }

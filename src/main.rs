@@ -21,7 +21,7 @@ fn main() {
         window_title = filename;
     }
 
-    app::run(machine, &window_title);
+    app::run(machine, &window_title).expect("Run app");
 }
 
 fn parse_args() -> (String, Option<i32>) {
