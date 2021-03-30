@@ -39,6 +39,7 @@ struct App {
     c8_screen_buffer: [u8; 4 * C8_WIDTH as usize * C8_HEIGHT as usize],
     chip8: Chip8,
     debug: bool,
+    paused: bool,
 }
 
 impl App {
@@ -50,6 +51,7 @@ impl App {
             c8_screen_buffer: c8_screen_buffer,
             chip8: chip8,
             debug: debug,
+            paused: false,
         };
         Ok(app)
     }
@@ -145,15 +147,27 @@ impl App {
         };
         graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
 
+        let text = Text::new((
+            format!("Status: {}", if self.paused { "PAUSED" } else { "RUNNING" }),
+            self.font,
+            font_size,
+        ));
+        let text_pos = Point2 {
+            x: 80.0,
+            y: DEBUG_Y_OFFSET as f32 + line_height * 7.0,
+        };
+        graphics::draw(ctx, &text, DrawParam::default().dest(text_pos))?;
+
         Ok(())
     }
 }
 
 impl EventHandler for App {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
-        let dt = timer::delta(ctx).as_secs_f64();
-
-        self.chip8.update(dt).expect("chip8 update");
+        if !self.paused {
+            let dt = timer::delta(ctx).as_secs_f64();
+            self.chip8.update(dt).expect("chip8 update");
+        }
 
         Ok(())
     }
@@ -210,6 +224,7 @@ impl EventHandler for App {
                 KeyCode::Escape => ggez::event::quit(ctx),
                 KeyCode::P => self.chip8.multiply_clock_frequency(1.25),
                 KeyCode::O => self.chip8.multiply_clock_frequency(0.8),
+                KeyCode::Return => self.paused = !self.paused,
                 _ => println!("Pressed: {:?}", keycode),
             }
         }
