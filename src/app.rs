@@ -36,7 +36,7 @@ pub fn run(chip8: Chip8, window_title: &str) -> Result<(), GameError> {
 
 struct App {
     font: Font,
-    image_buffer: [u8; 4 * C8_WIDTH as usize * C8_HEIGHT as usize],
+    c8_screen_buffer: [u8; 4 * C8_WIDTH as usize * C8_HEIGHT as usize],
     chip8: Chip8,
     debug: bool,
 }
@@ -44,10 +44,10 @@ struct App {
 impl App {
     pub fn new(ctx: &mut Context, chip8: Chip8, debug: bool) -> GameResult<App> {
         let font = Font::new(ctx, "/Merchant Copy.ttf")?;
-        let image_buffer = [255; 4 * C8_WIDTH as usize * C8_HEIGHT as usize];
+        let c8_screen_buffer = [255; 4 * C8_WIDTH as usize * C8_HEIGHT as usize];
         let app = App {
             font: font,
-            image_buffer: image_buffer,
+            c8_screen_buffer: c8_screen_buffer,
             chip8: chip8,
             debug: debug,
         };
@@ -154,24 +154,27 @@ impl EventHandler for App {
             for x in 0..C8_WIDTH {
                 let offset = 4 * (y as usize * C8_WIDTH as usize + x as usize);
                 if self.chip8.display_buffer.get_pixel(x, y) {
-                    self.image_buffer[offset] = 255;
-                    self.image_buffer[offset + 1] = 255;
-                    self.image_buffer[offset + 2] = 255;
+                    self.c8_screen_buffer[offset] = 255;
+                    self.c8_screen_buffer[offset + 1] = 255;
+                    self.c8_screen_buffer[offset + 2] = 255;
                 } else {
-                    self.image_buffer[offset] = 0;
-                    self.image_buffer[offset + 1] = 0;
-                    self.image_buffer[offset + 2] = 0;
+                    self.c8_screen_buffer[offset] = 0;
+                    self.c8_screen_buffer[offset + 1] = 0;
+                    self.c8_screen_buffer[offset + 2] = 0;
                 }
             }
         }
 
-        let mut image =
-            Image::from_rgba8(ctx, C8_WIDTH as u16, C8_HEIGHT as u16, &self.image_buffer)?;
-        image.set_filter(FilterMode::Nearest);
-
+        let mut c8_screen_image = Image::from_rgba8(
+            ctx,
+            C8_WIDTH as u16,
+            C8_HEIGHT as u16,
+            &self.c8_screen_buffer,
+        )?;
+        c8_screen_image.set_filter(FilterMode::Nearest);
         graphics::draw(
             ctx,
-            &image,
+            &c8_screen_image,
             DrawParam::default().scale([SCALING as f32, SCALING as f32]),
         )?;
 
