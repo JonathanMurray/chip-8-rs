@@ -1,5 +1,7 @@
 use crate::chip8::Chip8;
 
+use std::collections::HashMap;
+
 use ggez::conf::{WindowMode, WindowSetup};
 use ggez::event::{self, EventHandler, KeyCode, KeyMods};
 use ggez::graphics::{self, DrawParam, FilterMode, Font, Image, Text};
@@ -14,7 +16,11 @@ const DEBUG_MARGIN: u32 = 10;
 const DEBUG_Y_OFFSET: u32 = C8_HEIGHT as u32 * SCALING as u32 + DEBUG_MARGIN;
 const DEBUG_HEIGHT: u32 = 240;
 
-pub fn run(chip8: Chip8, window_title: &str) -> Result<(), GameError> {
+pub fn run(
+    chip8: Chip8,
+    disassembled_program: HashMap<usize, String>,
+    window_title: &str,
+) -> Result<(), GameError> {
     let debug = true;
     let window_width = C8_WIDTH as f32 * SCALING;
     let window_height;
@@ -30,7 +36,7 @@ pub fn run(chip8: Chip8, window_title: &str) -> Result<(), GameError> {
         .build()
         .expect("Creating ggez context");
 
-    let mut app = App::new(&mut ctx, chip8, debug)?;
+    let mut app = App::new(&mut ctx, chip8, disassembled_program, debug)?;
     event::run(&mut ctx, &mut event_loop, &mut app)
 }
 
@@ -38,18 +44,25 @@ struct App {
     font: Font,
     c8_screen_buffer: [u8; 4 * C8_WIDTH as usize * C8_HEIGHT as usize],
     chip8: Chip8,
+    disassembled_program: HashMap<usize, String>,
     debug: bool,
     paused: bool,
 }
 
 impl App {
-    pub fn new(ctx: &mut Context, chip8: Chip8, debug: bool) -> GameResult<App> {
+    pub fn new(
+        ctx: &mut Context,
+        chip8: Chip8,
+        disassembled_program: HashMap<usize, String>,
+        debug: bool,
+    ) -> GameResult<App> {
         let font = Font::new(ctx, "/Merchant Copy.ttf")?;
         let c8_screen_buffer = [255; 4 * C8_WIDTH as usize * C8_HEIGHT as usize];
         let app = App {
             font: font,
             c8_screen_buffer: c8_screen_buffer,
             chip8: chip8,
+            disassembled_program: disassembled_program,
             debug: debug,
             paused: false,
         };
@@ -108,7 +121,7 @@ impl App {
 
         y += line_height;
         self.draw_text(ctx, &"Stack:", x, y)?;
-        for i in 0..self.chip8.stack_pointer + 1 {
+        for i in 0..self.chip8.stack_pointer {
             self.draw_text(
                 ctx,
                 &format!("{:04X}", self.chip8.stack[i as usize]),
@@ -116,6 +129,23 @@ impl App {
                 y,
             )?;
         }
+
+        y += line_height;
+        self.draw_text(
+            ctx,
+            &format!(
+                "Next instr: {}",
+                match self
+                    .disassembled_program
+                    .get(&(self.chip8.program_counter as usize))
+                {
+                    Some(s) => s,
+                    None => "?",
+                }
+            ),
+            x,
+            y,
+        )?;
 
         y += line_height * 2.0;
         self.draw_text(

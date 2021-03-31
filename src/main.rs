@@ -1,5 +1,8 @@
 mod app;
+mod assembly;
 mod chip8;
+
+use std::collections::HashMap;
 
 use chip8::{Chip8, FONT_SPRITES};
 use std::env;
@@ -9,7 +12,7 @@ use std::io::Read;
 fn main() {
     let (filename, clock_frequency) = parse_args();
 
-    let mut chip8 = setup_chip8(&filename);
+    let (mut chip8, disassembled_program) = setup_chip8(&filename);
 
     let window_title;
     if let Some(freq) = clock_frequency {
@@ -21,7 +24,7 @@ fn main() {
         window_title = filename;
     }
 
-    app::run(chip8, &window_title).expect("Run app");
+    app::run(chip8, disassembled_program, &window_title).expect("Run app");
 }
 
 fn parse_args() -> (String, Option<u32>) {
@@ -60,16 +63,19 @@ fn parse_args() -> (String, Option<u32>) {
     (filename, clock_frequency)
 }
 
-fn setup_chip8(filename: &str) -> Chip8 {
+fn setup_chip8(filename: &str) -> (Chip8, HashMap<usize, String>) {
     let mut f = File::open(filename).expect("Opening ROM file");
     let mut buffer = Vec::new();
     f.read_to_end(&mut buffer).expect("Reading from ROM file");
     let mut memory = [0; 0x1000];
-    for (i, b) in buffer.into_iter().enumerate() {
-        memory[0x200 + i] = b;
+    for i in 0..buffer.len() {
+        memory[0x200 + i] = buffer[i];
     }
+
+    let disassembled_program = assembly::disassemble_rom(buffer);
+
     for i in 0..FONT_SPRITES.len() {
         memory[i] = FONT_SPRITES[i];
     }
-    Chip8::new(memory)
+    (Chip8::new(memory), disassembled_program)
 }
