@@ -162,7 +162,7 @@ impl Chip8 {
         }
 
         self.timer_cooldown -= elapsed_time;
-        if self.timer_cooldown <= 0.0 {
+        while self.timer_cooldown <= 0.0 {
             self.timer_cooldown += INTERVAL_60_HZ;
             if self.delay_timer > 0 {
                 self.delay_timer -= 1;
