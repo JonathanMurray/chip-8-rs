@@ -7,7 +7,7 @@ use ggez::timer;
 use ggez::{Context, ContextBuilder, GameError, GameResult};
 use mint::Point2;
 
-const COLOR_HIGHLIGHT: Color = Color::new(0.5, 1.0, 0.7, 1.0);
+const COLOR_HIGHLIGHT: Color = Color::new(0.4, 1.0, 0.5, 1.0);
 const COLOR_BG: Color = Color::new(0.2, 0.2, 0.3, 1.0);
 const SCALING: f32 = 8.0;
 const C8_WIDTH: u8 = 64;
@@ -52,6 +52,8 @@ struct App {
     debug: bool,
     paused: bool,
     instruction_listing: Vec<(usize, String)>,
+    cycles: u32,
+    fast_forwarded_cycles: u32,
 }
 
 impl App {
@@ -71,6 +73,8 @@ impl App {
             debug: debug,
             paused: false,
             instruction_listing: vec![(0, String::new()); INSTRUCTION_LISTING_LENGTH as usize],
+            cycles: 0,
+            fast_forwarded_cycles: 0,
         };
         Ok(app)
     }
@@ -185,6 +189,16 @@ impl App {
             y,
         )?;
 
+        y += line_height * 2.0;
+        self.draw_text(ctx, &format!("Cycles: {}", self.cycles), x, y)?;
+        y += line_height;
+        self.draw_text(
+            ctx,
+            &format!("Fast-forwarded cycles: {}", self.fast_forwarded_cycles),
+            x,
+            y,
+        )?;
+
         Ok(())
     }
 
@@ -235,7 +249,11 @@ impl EventHandler for App {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
         if !self.paused {
             let dt = timer::delta(ctx).as_secs_f64();
-            self.chip8.update(dt).expect("chip8 update");
+            let cycles = self.chip8.update(dt).expect("chip8 update");
+            self.cycles += cycles;
+            if cycles > 1 {
+                self.fast_forwarded_cycles += cycles - 1;
+            }
         }
 
         Ok(())
@@ -295,7 +313,8 @@ impl EventHandler for App {
                 KeyCode::P => self.chip8.multiply_clock_frequency(1.25),
                 KeyCode::O => self.chip8.multiply_clock_frequency(0.8),
                 KeyCode::Return => self.paused = !self.paused,
-                _ => println!("Pressed: {:?}", keycode),
+                KeyCode::L => self.debug = !self.debug,
+                _ => {}
             }
         }
     }

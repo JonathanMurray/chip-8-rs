@@ -10,17 +10,14 @@ fn main() {
 
     let (mut chip8, disassembled_program) = setup_chip8(&filename);
 
-    let window_title;
     if let Some(freq) = clock_frequency {
         chip8.set_clock_frequency(freq);
         println!("Running {} at {} Hz", filename, freq);
-        window_title = format!("{} ({}Hz)", filename, freq);
     } else {
         println!("Running {}", filename);
-        window_title = filename;
     }
 
-    app::run(chip8, disassembled_program, &window_title).expect("Run app");
+    app::run(chip8, disassembled_program, &filename).expect("Run app");
 }
 
 fn parse_args() -> (String, Option<u32>) {

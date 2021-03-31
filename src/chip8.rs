@@ -154,11 +154,13 @@ impl Chip8 {
         self.clock_frequency
     }
 
-    pub fn update(&mut self, elapsed_time: f64) -> Result<(), String> {
+    pub fn update(&mut self, elapsed_time: f64) -> Result<u32, String> {
         self.cycle_cooldown -= elapsed_time;
+        let mut cycles = 0;
         while self.cycle_cooldown <= 0.0 {
             self.cycle_cooldown += self.clock_frequency_interval;
             self.step()?;
+            cycles += 1;
         }
 
         self.timer_cooldown -= elapsed_time;
@@ -172,7 +174,7 @@ impl Chip8 {
                 self.sound_timer -= 1;
             }
         }
-        Ok(())
+        Ok(cycles)
     }
 
     fn step(&mut self) -> Result<(), String> {
