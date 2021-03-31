@@ -1,8 +1,6 @@
-mod app;
-mod assembly;
-mod chip8;
+use chip_8_rs::chip8::{Chip8, FONT_SPRITES};
+use chip_8_rs::{app, assembly};
 
-use chip8::{Chip8, FONT_SPRITES};
 use std::env;
 use std::fs::File;
 use std::io::Read;

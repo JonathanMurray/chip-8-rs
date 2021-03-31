@@ -2,6 +2,7 @@ pub fn disassemble_rom(buffer: Vec<u8>) -> Vec<String> {
     let mut disassembled = vec![String::new(); 0x1000];
 
     let mut visited = Vec::new();
+    let mut return_addresses = Vec::new();
     let mut pc = 0x200;
     loop {
         if pc < 0x200 || pc - 0x200 + 1 >= buffer.len() {
@@ -25,6 +26,23 @@ pub fn disassemble_rom(buffer: Vec<u8>) -> Vec<String> {
             } else {
                 pc += 2;
             }
+        } else if opcode & 0xF000 == 0x2000 {
+            // We follow the call instruction (it may point to an unaligned address)
+            let destination = (opcode & 0x0FFF) as usize;
+            if !visited.contains(&destination) {
+                visited.push(destination);
+                return_addresses.push(pc);
+                pc = destination;
+            } else {
+                pc += 2;
+            }
+        } else if opcode == 0x00EE {
+            // We follow the return instruction
+            if return_addresses.len() > 0 {
+                pc = return_addresses.pop().expect("Popping return address");
+            } else {
+                pc += 2;
+            }
         } else {
             pc += 2;
         }
@@ -35,8 +53,8 @@ pub fn disassemble_rom(buffer: Vec<u8>) -> Vec<String> {
 pub fn disassemble_opcode(opcode: u16) -> Result<String, String> {
     let s = match opcode & 0xF000 {
         0x0000 => match opcode {
-            0x00ee => "return".to_owned(),
-            0x00e0 => "clear screen".to_owned(),
+            0x00EE => "return".to_owned(),
+            0x00E0 => "clear screen".to_owned(),
             _ => {
                 let address = opcode & 0x0FFF;
                 format!("call (machine): {:#05X}", address)
@@ -206,7 +224,7 @@ fn test_disassemble_opcode() {
 }
 
 #[test]
-fn test_disassemble_rom_aligned() {
+fn test_disassemble_rom() {
     let rom = vec![
         0xF7, 0x0A, // instruction
         0x83, 0x67, // instruction
@@ -219,7 +237,7 @@ fn test_disassemble_rom_aligned() {
 }
 
 #[test]
-fn test_disassemble_rom_unaligned() {
+fn test_disassemble_rom_jump_to_unaligned() {
     let rom = vec![
         0xF7, 0x0A, // instruction
         0x12, 0x05, // jump instruction
@@ -232,5 +250,22 @@ fn test_disassemble_rom_unaligned() {
 
     assert_eq!(result[0x200], "V7 = get_key()".to_owned());
     assert_eq!(result[0x202], "jump: 0x205".to_owned());
+    assert_eq!(result[0x205], "V7 = get_key()".to_owned());
+}
+
+#[test]
+fn test_disassemble_rom_call_to_unaligned() {
+    let rom = vec![
+        0xF7, 0x0A, // instruction
+        0x22, 0x05, // call instruction
+        0xFF, // junk
+        0xF7, 0x0A, // instruction
+        0xFF, // junk
+    ];
+
+    let result = disassemble_rom(rom);
+
+    assert_eq!(result[0x200], "V7 = get_key()".to_owned());
+    assert_eq!(result[0x202], "call: 0x205".to_owned());
     assert_eq!(result[0x205], "V7 = get_key()".to_owned());
 }

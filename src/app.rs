@@ -193,10 +193,10 @@ impl App {
         let margin = 15.0;
         let pc = self.chip8.program_counter as usize;
         if pc < self.instruction_listing[0].0
-            || pc >= self.instruction_listing[INSTRUCTION_LISTING_LENGTH as usize - 1].0
+            || pc > self.instruction_listing[INSTRUCTION_LISTING_LENGTH as usize - 1].0
         {
-            let mut address =
-                (pc / INSTRUCTION_LISTING_LENGTH as usize) * INSTRUCTION_LISTING_LENGTH as usize;
+            let mut address = (pc as f32 / INSTRUCTION_LISTING_LENGTH as f32) as usize
+                * INSTRUCTION_LISTING_LENGTH as usize;
             let mut i = 0;
             while address < 0x1000 && i < INSTRUCTION_LISTING_LENGTH as usize {
                 let text = self
@@ -209,16 +209,22 @@ impl App {
                 }
                 address += 1;
             }
+            while i < INSTRUCTION_LISTING_LENGTH as usize {
+                self.instruction_listing[i] = (usize::MAX, String::new());
+                i += 1;
+            }
         }
 
         let x = INSTRUCTION_LISTING_X_OFFSET as f32 + margin;
         for (i, (address, text)) in self.instruction_listing.iter().enumerate() {
-            let y = margin + i as f32 * line_height;
-            let line = format!("{:03X}: {}", address, text);
-            if &pc == address {
-                self.draw_text_with_color(ctx, &line, x, y, COLOR_HIGHLIGHT)?;
-            } else {
-                self.draw_text(ctx, &line, x, y)?;
+            if address != &usize::MAX {
+                let y = margin + i as f32 * line_height;
+                let line = format!("{:03X}: {}", address, text);
+                if &pc == address {
+                    self.draw_text_with_color(ctx, &line, x, y, COLOR_HIGHLIGHT)?;
+                } else {
+                    self.draw_text(ctx, &line, x, y)?;
+                }
             }
         }
         Ok(())

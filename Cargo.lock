@@ -271,6 +271,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chip-8-rs"
+version = "0.1.0"
+dependencies = [
+ "ggez",
+ "mint",
+ "rand 0.8.3",
+]
+
+[[package]]
 name = "clang-sys"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1791,15 +1800,6 @@ dependencies = [
  "blake2b_simd",
  "constant_time_eq",
  "crossbeam-utils 0.8.3",
-]
-
-[[package]]
-name = "rust-chip-8"
-version = "0.1.0"
-dependencies = [
- "ggez",
- "mint",
- "rand 0.8.3",
 ]
 
 [[package]]
