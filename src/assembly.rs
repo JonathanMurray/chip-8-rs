@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
-pub fn disassemble_rom(buffer: Vec<u8>) -> HashMap<usize, String> {
-    let mut disassembled = HashMap::new();
+pub fn disassemble_rom(buffer: Vec<u8>) -> Vec<String> {
+    let mut disassembled = vec![String::new(); 0x1000];
 
     let mut visited = Vec::new();
     let mut pc = 0x200;
@@ -16,7 +14,7 @@ pub fn disassemble_rom(buffer: Vec<u8>) -> HashMap<usize, String> {
             Err(_err) => format!("DATA[{:#06X}]", opcode),
         };
 
-        disassembled.insert(0x200 + offset, text);
+        disassembled[0x200 + offset] = text;
 
         if opcode & 0xF000 == 0x1000 {
             // We follow the jump instruction (it may point to an unaligned address)
@@ -216,14 +214,8 @@ fn test_disassemble_rom_aligned() {
 
     let result = disassemble_rom(rom);
 
-    let expected: HashMap<usize, String> = [
-        (0x200, "V7 = get_key()".to_owned()),
-        (0x202, "V3 = V6 - V3".to_owned()),
-    ]
-    .iter()
-    .cloned()
-    .collect();
-    assert_eq!(result, expected);
+    assert_eq!(result[0x200], "V7 = get_key()".to_owned());
+    assert_eq!(result[0x202], "V3 = V6 - V3".to_owned());
 }
 
 #[test]
@@ -238,13 +230,7 @@ fn test_disassemble_rom_unaligned() {
 
     let result = disassemble_rom(rom);
 
-    let expected: HashMap<usize, String> = [
-        (0x200, "V7 = get_key()".to_owned()),
-        (0x202, "jump: 0x205".to_owned()),
-        (0x205, "V7 = get_key()".to_owned()),
-    ]
-    .iter()
-    .cloned()
-    .collect();
-    assert_eq!(result, expected);
+    assert_eq!(result[0x200], "V7 = get_key()".to_owned());
+    assert_eq!(result[0x202], "jump: 0x205".to_owned());
+    assert_eq!(result[0x205], "V7 = get_key()".to_owned());
 }

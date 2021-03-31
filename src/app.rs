@@ -1,32 +1,36 @@
 use crate::chip8::Chip8;
 
-use std::collections::HashMap;
-
 use ggez::conf::{WindowMode, WindowSetup};
 use ggez::event::{self, EventHandler, KeyCode, KeyMods};
-use ggez::graphics::{self, DrawParam, FilterMode, Font, Image, Text};
+use ggez::graphics::{self, Color, DrawParam, FilterMode, Font, Image, Text};
 use ggez::timer;
 use ggez::{Context, ContextBuilder, GameError, GameResult};
 use mint::Point2;
 
+const COLOR_HIGHLIGHT: Color = Color::new(0.5, 1.0, 0.7, 1.0);
+const COLOR_BG: Color = Color::new(0.2, 0.2, 0.3, 1.0);
 const SCALING: f32 = 8.0;
 const C8_WIDTH: u8 = 64;
 const C8_HEIGHT: u8 = 32;
-const DEBUG_MARGIN: u32 = 10;
-const DEBUG_Y_OFFSET: u32 = C8_HEIGHT as u32 * SCALING as u32 + DEBUG_MARGIN;
-const DEBUG_HEIGHT: u32 = 240;
+const DEBUG_Y_OFFSET: u32 = C8_HEIGHT as u32 * SCALING as u32;
+const DEBUG_HEIGHT: u32 = 255;
+const INSTRUCTION_LISTING_X_OFFSET: u32 = C8_WIDTH as u32 * SCALING as u32;
+const INSTRUCTION_LISTING_WIDTH: u32 = 200;
+const INSTRUCTION_LISTING_LENGTH: u32 = 32;
 
 pub fn run(
     chip8: Chip8,
-    disassembled_program: HashMap<usize, String>,
+    disassembled_program: Vec<String>,
     window_title: &str,
 ) -> Result<(), GameError> {
     let debug = true;
-    let window_width = C8_WIDTH as f32 * SCALING;
+    let window_width;
     let window_height;
     if debug {
-        window_height = C8_HEIGHT as f32 * SCALING + DEBUG_MARGIN as f32 + DEBUG_HEIGHT as f32;
+        window_width = C8_WIDTH as f32 * SCALING + INSTRUCTION_LISTING_WIDTH as f32;
+        window_height = C8_HEIGHT as f32 * SCALING + DEBUG_HEIGHT as f32;
     } else {
+        window_width = C8_WIDTH as f32 * SCALING;
         window_height = C8_HEIGHT as f32 * SCALING;
     }
     let (mut ctx, mut event_loop) = ContextBuilder::new("ggez_test", "jm")
@@ -44,16 +48,17 @@ struct App {
     font: Font,
     c8_screen_buffer: [u8; 4 * C8_WIDTH as usize * C8_HEIGHT as usize],
     chip8: Chip8,
-    disassembled_program: HashMap<usize, String>,
+    disassembled_program: Vec<String>,
     debug: bool,
     paused: bool,
+    instruction_listing: Vec<(usize, String)>,
 }
 
 impl App {
     pub fn new(
         ctx: &mut Context,
         chip8: Chip8,
-        disassembled_program: HashMap<usize, String>,
+        disassembled_program: Vec<String>,
         debug: bool,
     ) -> GameResult<App> {
         let font = Font::new(ctx, "/Merchant Copy.ttf")?;
@@ -65,6 +70,7 @@ impl App {
             disassembled_program: disassembled_program,
             debug: debug,
             paused: false,
+            instruction_listing: vec![(0, String::new()); INSTRUCTION_LISTING_LENGTH as usize],
         };
         Ok(app)
     }
@@ -74,20 +80,39 @@ impl App {
         graphics::draw(ctx, &text, DrawParam::default().dest(Point2 { x: x, y: y }))
     }
 
+    fn draw_text_with_color(
+        &self,
+        ctx: &mut Context,
+        s: &str,
+        x: f32,
+        y: f32,
+        color: Color,
+    ) -> GameResult<()> {
+        let text = Text::new((s, self.font, 12.5));
+        graphics::draw(
+            ctx,
+            &text,
+            DrawParam::default()
+                .dest(Point2 { x: x, y: y })
+                .color(color),
+        )
+    }
+
     fn draw_debug_area(&mut self, ctx: &mut Context) -> GameResult<()> {
-        let line_height = 14.5;
+        let line_height = 15.0;
+        let margin = 10.0;
 
         for (i, register_value) in self.chip8.registers.iter().enumerate() {
             self.draw_text(
                 ctx,
                 &format!("V{:X}: {:02X}", i, register_value),
-                10.0,
-                DEBUG_Y_OFFSET as f32 + i as f32 * line_height,
+                margin,
+                DEBUG_Y_OFFSET as f32 + margin + i as f32 * line_height,
             )?;
         }
 
         let x = 80.0;
-        let mut y = DEBUG_Y_OFFSET as f32;
+        let mut y = DEBUG_Y_OFFSET as f32 + margin;
         self.draw_text(
             ctx,
             &format!("I: {:04X}", self.chip8.address_register),
@@ -98,7 +123,7 @@ impl App {
         y += line_height;
         self.draw_text(
             ctx,
-            &format!("PC: {:04X}", self.chip8.program_counter),
+            &format!("PC: {:03X}", self.chip8.program_counter),
             x,
             y,
         )?;
@@ -119,33 +144,30 @@ impl App {
             y,
         )?;
 
-        y += line_height;
+        y += line_height * 2.0;
         self.draw_text(ctx, &"Stack:", x, y)?;
         for i in 0..self.chip8.stack_pointer {
             self.draw_text(
                 ctx,
-                &format!("{:04X}", self.chip8.stack[i as usize]),
-                x + 50.0 + i as f32 * 40.0,
+                &format!("{:03X}", self.chip8.stack[i as usize]),
+                x + 50.0 + i as f32 * 28.0,
                 y,
             )?;
         }
 
-        y += line_height;
-        self.draw_text(
-            ctx,
-            &format!(
-                "Next instr: {}",
-                match self
-                    .disassembled_program
-                    .get(&(self.chip8.program_counter as usize))
-                {
-                    Some(s) => s,
-                    None => "?",
-                }
-            ),
-            x,
-            y,
-        )?;
+        y += line_height * 2.0;
+        self.draw_text(ctx, "Next instruction:", x, y)?;
+        let text = format!(
+            "{}",
+            match self
+                .disassembled_program
+                .get(self.chip8.program_counter as usize)
+            {
+                Some(s) => s,
+                None => "?",
+            }
+        );
+        self.draw_text_with_color(ctx, &text, x + 120.0, y, COLOR_HIGHLIGHT)?;
 
         y += line_height * 2.0;
         self.draw_text(
@@ -155,7 +177,7 @@ impl App {
             y,
         )?;
 
-        y += line_height;
+        y += line_height * 2.0;
         self.draw_text(
             ctx,
             &format!("Status: {}", if self.paused { "PAUSED" } else { "RUNNING" }),
@@ -163,6 +185,42 @@ impl App {
             y,
         )?;
 
+        Ok(())
+    }
+
+    fn draw_instruction_listing(&mut self, ctx: &mut Context) -> GameResult<()> {
+        let line_height = 15.0;
+        let margin = 15.0;
+        let pc = self.chip8.program_counter as usize;
+        if pc < self.instruction_listing[0].0
+            || pc >= self.instruction_listing[INSTRUCTION_LISTING_LENGTH as usize - 1].0
+        {
+            let mut address =
+                (pc / INSTRUCTION_LISTING_LENGTH as usize) * INSTRUCTION_LISTING_LENGTH as usize;
+            let mut i = 0;
+            while address < 0x1000 && i < INSTRUCTION_LISTING_LENGTH as usize {
+                let text = self
+                    .disassembled_program
+                    .get(address)
+                    .expect("Get disassembled");
+                if !text.is_empty() {
+                    self.instruction_listing[i] = (address, text.clone());
+                    i += 1;
+                }
+                address += 1;
+            }
+        }
+
+        let x = INSTRUCTION_LISTING_X_OFFSET as f32 + margin;
+        for (i, (address, text)) in self.instruction_listing.iter().enumerate() {
+            let y = margin + i as f32 * line_height;
+            let line = format!("{:03X}: {}", address, text);
+            if &pc == address {
+                self.draw_text_with_color(ctx, &line, x, y, COLOR_HIGHLIGHT)?;
+            } else {
+                self.draw_text(ctx, &line, x, y)?;
+            }
+        }
         Ok(())
     }
 }
@@ -178,7 +236,7 @@ impl EventHandler for App {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
-        graphics::clear(ctx, graphics::Color::from_rgb(120, 120, 120));
+        graphics::clear(ctx, COLOR_BG);
 
         for y in 0..C8_HEIGHT {
             for x in 0..C8_WIDTH {
@@ -210,6 +268,7 @@ impl EventHandler for App {
 
         if self.debug {
             self.draw_debug_area(ctx)?;
+            self.draw_instruction_listing(ctx)?;
         }
 
         graphics::present(ctx)

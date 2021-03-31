@@ -2,8 +2,6 @@ mod app;
 mod assembly;
 mod chip8;
 
-use std::collections::HashMap;
-
 use chip8::{Chip8, FONT_SPRITES};
 use std::env;
 use std::fs::File;
@@ -63,7 +61,7 @@ fn parse_args() -> (String, Option<u32>) {
     (filename, clock_frequency)
 }
 
-fn setup_chip8(filename: &str) -> (Chip8, HashMap<usize, String>) {
+fn setup_chip8(filename: &str) -> (Chip8, Vec<String>) {
     let mut f = File::open(filename).expect("Opening ROM file");
     let mut buffer = Vec::new();
     f.read_to_end(&mut buffer).expect("Reading from ROM file");
