@@ -6,7 +6,7 @@ Run and debug Chip-8 games, see register contents and disassembled instructions:
 
 <img
     src="https://github.com/JonathanMurray/chip-8-rs/blob/master/resources/screenshots/example_screenshot_pong_debug.png"
-    height="200"
+    height="300"
 />
 <br/>
 
