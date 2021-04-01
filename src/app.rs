@@ -82,36 +82,6 @@ impl App {
         Ok(app)
     }
 
-    fn draw_text(&self, ctx: &mut Context, s: &str, x: f32, y: f32) -> GameResult<()> {
-        let text = Text::new((s, self.font, 25.0));
-        graphics::draw(
-            ctx,
-            &text,
-            DrawParam::default()
-                .scale([0.5, 0.5])
-                .dest(Point2 { x: x, y: y }),
-        )
-    }
-
-    fn draw_text_with_color(
-        &self,
-        ctx: &mut Context,
-        s: &str,
-        x: f32,
-        y: f32,
-        color: Color,
-    ) -> GameResult<()> {
-        let text = Text::new((s, self.font, 25.0));
-        graphics::draw(
-            ctx,
-            &text,
-            DrawParam::default()
-                .scale([0.5, 0.5])
-                .dest(Point2 { x: x, y: y })
-                .color(color),
-        )
-    }
-
     fn draw_debug_area(&mut self, ctx: &mut Context) -> GameResult<()> {
         let line_height = 15.0;
         let margin = 10.0;
@@ -253,6 +223,69 @@ impl App {
         }
         Ok(())
     }
+
+    fn draw_text(&self, ctx: &mut Context, s: &str, x: f32, y: f32) -> GameResult<()> {
+        let text = Text::new((s, self.font, 25.0));
+        graphics::draw(
+            ctx,
+            &text,
+            DrawParam::default()
+                .scale([0.5, 0.5])
+                .dest(Point2 { x: x, y: y }),
+        )
+    }
+
+    fn draw_text_with_color(
+        &self,
+        ctx: &mut Context,
+        s: &str,
+        x: f32,
+        y: f32,
+        color: Color,
+    ) -> GameResult<()> {
+        let text = Text::new((s, self.font, 25.0));
+        graphics::draw(
+            ctx,
+            &text,
+            DrawParam::default()
+                .scale([0.5, 0.5])
+                .dest(Point2 { x: x, y: y })
+                .color(color),
+        )
+    }
+
+    fn update_c8_screen_buffer(&mut self) {
+        for y in 0..C8_HEIGHT {
+            for x in 0..C8_WIDTH {
+                let offset = 4 * (y as usize * C8_WIDTH as usize + x as usize);
+                if self.chip8.display_buffer.get_pixel(x, y) {
+                    self.c8_screen_buffer[offset] = 255;
+                    self.c8_screen_buffer[offset + 1] = 255;
+                    self.c8_screen_buffer[offset + 2] = 255;
+                } else {
+                    self.c8_screen_buffer[offset] = 0;
+                    self.c8_screen_buffer[offset + 1] = 0;
+                    self.c8_screen_buffer[offset + 2] = 0;
+                }
+            }
+        }
+    }
+
+    fn draw_c8_screen(&self, ctx: &mut Context) -> GameResult<()> {
+        let mut c8_screen_image = Image::from_rgba8(
+            ctx,
+            C8_WIDTH as u16,
+            C8_HEIGHT as u16,
+            &self.c8_screen_buffer,
+        )?;
+        c8_screen_image.set_filter(FilterMode::Nearest);
+        graphics::draw(
+            ctx,
+            &c8_screen_image,
+            DrawParam::default().scale([SCALING as f32, SCALING as f32]),
+        )?;
+        Ok(())
+    }
 }
 
 impl EventHandler for App {
@@ -274,40 +307,12 @@ impl EventHandler for App {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, COLOR_BG);
-
-        for y in 0..C8_HEIGHT {
-            for x in 0..C8_WIDTH {
-                let offset = 4 * (y as usize * C8_WIDTH as usize + x as usize);
-                if self.chip8.display_buffer.get_pixel(x, y) {
-                    self.c8_screen_buffer[offset] = 255;
-                    self.c8_screen_buffer[offset + 1] = 255;
-                    self.c8_screen_buffer[offset + 2] = 255;
-                } else {
-                    self.c8_screen_buffer[offset] = 0;
-                    self.c8_screen_buffer[offset + 1] = 0;
-                    self.c8_screen_buffer[offset + 2] = 0;
-                }
-            }
-        }
-
-        let mut c8_screen_image = Image::from_rgba8(
-            ctx,
-            C8_WIDTH as u16,
-            C8_HEIGHT as u16,
-            &self.c8_screen_buffer,
-        )?;
-        c8_screen_image.set_filter(FilterMode::Nearest);
-        graphics::draw(
-            ctx,
-            &c8_screen_image,
-            DrawParam::default().scale([SCALING as f32, SCALING as f32]),
-        )?;
-
+        self.update_c8_screen_buffer();
+        self.draw_c8_screen(ctx)?;
         if self.debug {
             self.draw_debug_area(ctx)?;
             self.draw_instruction_listing(ctx)?;
         }
-
         graphics::present(ctx)
     }
 
