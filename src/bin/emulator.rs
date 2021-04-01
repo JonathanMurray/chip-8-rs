@@ -1,12 +1,13 @@
 use chip_8_rs::chip8::{Chip8, FONT_SPRITES};
 use chip_8_rs::{app, assembly};
 
-use std::env;
 use std::fs::File;
 use std::io::Read;
 
+use clap::{App, Arg};
+
 fn main() {
-    let (filename, clock_frequency) = parse_args();
+    let (filename, clock_frequency, debug) = parse_args();
 
     let (mut chip8, disassembled_program) = setup_chip8(&filename);
 
@@ -17,43 +18,54 @@ fn main() {
         println!("Running {}", filename);
     }
 
-    app::run(chip8, disassembled_program, filename).expect("Run app");
+    app::run(chip8, disassembled_program, filename, debug).expect("Run app");
 }
 
-fn parse_args() -> (String, Option<u32>) {
-    let mut args: Vec<String> = env::args().collect();
-    let filename: String;
-    let mut clock_frequency = None;
-    match args.len() {
-        1 => {
-            filename = "Space Invaders [David Winter].ch8".to_string();
-        }
-        2 => {
-            filename = args.remove(1);
-        }
-        3 => {
-            filename = args.remove(1);
-            let clock_frequency_arg = &args[1];
-            match clock_frequency_arg.parse::<u32>() {
-                Ok(freq) => {
-                    clock_frequency = Some(freq);
-                }
-                Err(err) => {
-                    println!(
-                        "Invalid non-integer clock frequency: {} ({})",
-                        clock_frequency_arg, err
-                    );
-                    println!("Usage: {} [ filename [clock_frequency] ]", args[0]);
-                    std::process::exit(1);
-                }
+fn parse_args() -> (String, Option<u32>, bool) {
+    let matches = App::new("Chip-8 emulator")
+        .version("0.1.0")
+        .about("An emulator/debugger of the virtual machine Chip-8, programmed in Rust.")
+        .arg(
+            Arg::with_name("ROM_FILE")
+                .short("f")
+                .long("file")
+                .takes_value(true)
+                .help("A file containing the program that will be run"),
+        )
+        .arg(
+            Arg::with_name("CLOCK_FREQUENCY")
+                .short("c")
+                .long("clock")
+                .takes_value(true)
+                .help("The number of instructions to be executed by Chip-8 per second"),
+        )
+        .arg(
+            Arg::with_name("DEBUG")
+                .short("d")
+                .long("debug")
+                .help("Show debug information (like register contents and disassembled instructions) while running"),
+        )
+        .get_matches();
+
+    let filename = matches
+        .value_of("ROM_FILE")
+        .unwrap_or("Space Invaders [David Winter].ch8")
+        .to_owned();
+
+    let clock_frequency = match matches.value_of("CLOCK_FREQUENCY") {
+        Some(freq) => match freq.parse::<u32>() {
+            Ok(freq) => Some(freq),
+            Err(err) => {
+                println!("Invalid non-integer clock frequency: {} ({})", freq, err);
+                std::process::exit(1);
             }
-        }
-        _ => {
-            println!("Usage: {} [ filename [clock_frequency] ]", args[0]);
-            std::process::exit(1);
-        }
-    }
-    (filename, clock_frequency)
+        },
+        None => None,
+    };
+
+    let debug = matches.occurrences_of("DEBUG") > 0;
+
+    (filename, clock_frequency, debug)
 }
 
 fn setup_chip8(filename: &str) -> (Chip8, Vec<String>) {

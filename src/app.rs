@@ -22,8 +22,8 @@ pub fn run(
     chip8: Chip8,
     disassembled_program: Vec<String>,
     window_title: String,
+    debug: bool,
 ) -> Result<(), GameError> {
-    let debug = true;
     let window_width;
     let window_height;
     if debug {
