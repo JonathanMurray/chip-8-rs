@@ -17,7 +17,7 @@ fn main() {
         println!("Running {}", filename);
     }
 
-    app::run(chip8, disassembled_program, &filename).expect("Run app");
+    app::run(chip8, disassembled_program, filename).expect("Run app");
 }
 
 fn parse_args() -> (String, Option<u32>) {

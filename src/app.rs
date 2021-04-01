@@ -21,7 +21,7 @@ const INSTRUCTION_LISTING_LENGTH: u32 = 32;
 pub fn run(
     chip8: Chip8,
     disassembled_program: Vec<String>,
-    window_title: &str,
+    window_title: String,
 ) -> Result<(), GameError> {
     let debug = true;
     let window_width;
@@ -34,13 +34,13 @@ pub fn run(
         window_height = C8_HEIGHT as f32 * SCALING;
     }
     let (mut ctx, mut event_loop) = ContextBuilder::new("ggez_test", "jm")
-        .window_setup(WindowSetup::default().title(window_title))
+        .window_setup(WindowSetup::default().title(&window_title))
         .window_mode(WindowMode::default().dimensions(window_width, window_height))
         .add_resource_path(".")
         .build()
         .expect("Creating ggez context");
 
-    let mut app = App::new(&mut ctx, chip8, disassembled_program, debug)?;
+    let mut app = App::new(&mut ctx, chip8, disassembled_program, debug, window_title)?;
     event::run(&mut ctx, &mut event_loop, &mut app)
 }
 
@@ -54,6 +54,7 @@ struct App {
     instruction_listing: Vec<(usize, String)>,
     cycles: u32,
     fast_forwarded_cycles: u32,
+    window_title: String,
 }
 
 impl App {
@@ -62,6 +63,7 @@ impl App {
         chip8: Chip8,
         disassembled_program: Vec<String>,
         debug: bool,
+        window_title: String,
     ) -> GameResult<App> {
         let font = Font::new(ctx, "/Merchant Copy.ttf")?;
         let c8_screen_buffer = [255; 4 * C8_WIDTH as usize * C8_HEIGHT as usize];
@@ -75,6 +77,7 @@ impl App {
             instruction_listing: vec![(0, String::new()); INSTRUCTION_LISTING_LENGTH as usize],
             cycles: 0,
             fast_forwarded_cycles: 0,
+            window_title: window_title,
         };
         Ok(app)
     }
@@ -262,6 +265,9 @@ impl EventHandler for App {
                 self.fast_forwarded_cycles += cycles - 1;
             }
         }
+
+        let fps = timer::fps(ctx) as u32;
+        graphics::set_window_title(ctx, &format!("[{}]    (FPS: {})", self.window_title, fps));
 
         Ok(())
     }
