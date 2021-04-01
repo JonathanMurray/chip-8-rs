@@ -36,7 +36,7 @@ pub fn run(
     let (mut ctx, mut event_loop) = ContextBuilder::new("ggez_test", "jm")
         .window_setup(WindowSetup::default().title(&window_title))
         .window_mode(WindowMode::default().dimensions(window_width, window_height))
-        .add_resource_path(".")
+        .add_resource_path("resources")
         .build()
         .expect("Creating ggez context");
 
@@ -65,7 +65,7 @@ impl App {
         debug: bool,
         window_title: String,
     ) -> GameResult<App> {
-        let font = Font::new(ctx, "/Merchant Copy.ttf")?;
+        let font = Font::new(ctx, "/fonts/Merchant Copy.ttf")?;
         let c8_screen_buffer = [255; 4 * C8_WIDTH as usize * C8_HEIGHT as usize];
         let app = App {
             font: font,
