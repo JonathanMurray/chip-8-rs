@@ -80,8 +80,14 @@ impl App {
     }
 
     fn draw_text(&self, ctx: &mut Context, s: &str, x: f32, y: f32) -> GameResult<()> {
-        let text = Text::new((s, self.font, 12.5));
-        graphics::draw(ctx, &text, DrawParam::default().dest(Point2 { x: x, y: y }))
+        let text = Text::new((s, self.font, 25.0));
+        graphics::draw(
+            ctx,
+            &text,
+            DrawParam::default()
+                .scale([0.5, 0.5])
+                .dest(Point2 { x: x, y: y }),
+        )
     }
 
     fn draw_text_with_color(
@@ -92,11 +98,12 @@ impl App {
         y: f32,
         color: Color,
     ) -> GameResult<()> {
-        let text = Text::new((s, self.font, 12.5));
+        let text = Text::new((s, self.font, 25.0));
         graphics::draw(
             ctx,
             &text,
             DrawParam::default()
+                .scale([0.5, 0.5])
                 .dest(Point2 { x: x, y: y })
                 .color(color),
         )
