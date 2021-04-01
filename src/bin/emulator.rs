@@ -49,15 +49,14 @@ fn parse_args() -> (String, Option<u32>, bool) {
 
     let filename = matches
         .value_of("ROM_FILE")
-        .unwrap_or("Space Invaders [David Winter].ch8")
+        .unwrap_or("programs/Space Invaders [David Winter].ch8")
         .to_owned();
 
     let clock_frequency = match matches.value_of("CLOCK_FREQUENCY") {
         Some(freq) => match freq.parse::<u32>() {
             Ok(freq) => Some(freq),
             Err(err) => {
-                println!("Invalid non-integer clock frequency: {} ({})", freq, err);
-                std::process::exit(1);
+                panic!("Invalid non-integer clock frequency: {} ({})", freq, err);
             }
         },
         None => None,
@@ -69,9 +68,10 @@ fn parse_args() -> (String, Option<u32>, bool) {
 }
 
 fn setup_chip8(filename: &str) -> (Chip8, Vec<String>) {
-    let mut f = File::open(filename).expect("Opening ROM file");
+    let mut f = File::open(filename).expect(&format!("Couldn't open ROM file: {}", filename));
     let mut buffer = Vec::new();
-    f.read_to_end(&mut buffer).expect("Reading from ROM file");
+    f.read_to_end(&mut buffer)
+        .expect(&format!("Couldn't read from ROM file: {}", filename));
     let mut memory = [0; 0x1000];
     for i in 0..buffer.len() {
         memory[0x200 + i] = buffer[i];

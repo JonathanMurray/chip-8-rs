@@ -24,7 +24,21 @@ cargo run --release --bin emulator
 cargo run --release --bin emulator -- --debug
 ```
 
-To see all run options:
+Learn about more flags/options:
 ```bash
 cargo run --release --bin emulator -- --help
+```
+
+### Disassembler
+
+Disassemble a C8 program to a text file:
+```bash
+$ cargo run --quiet --bin disassembler programs/c8_test.c8 c8_test_disassembly.txt
+Wrote 23 instructions to c8_test_disassembly.txt
+$ cat c8_test_disassembly.txt | head -5
+200: V0 = 0xFF
+202: I = delay_timer(V0)
+204: V0 = 0x00
+206: V9 = 0x00
+208: VE = 0x00
 ```

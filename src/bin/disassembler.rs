@@ -19,20 +19,27 @@ fn main() {
 }
 
 fn disassemble(filename: &str, result_filename: &str) {
-    let mut f = File::open(filename).expect("Opening ROM file");
+    let mut f = File::open(filename).expect(&format!("Couldn't open ROM file: {}", filename));
     let mut buffer = Vec::new();
-    f.read_to_end(&mut buffer).expect("Reading from ROM file");
+    f.read_to_end(&mut buffer)
+        .expect(&format!("Couldn't read from ROM file: {}", filename));
     let mut memory = [0; 0x1000];
     for i in 0..buffer.len() {
         memory[0x200 + i] = buffer[i];
     }
     let disassembled_program = assembly::disassemble_rom(buffer);
 
-    let mut output_file = File::create(&result_filename).expect("Opening output file");
+    let mut output_file = File::create(&result_filename)
+        .expect(&format!("Couldn't create output file: {}", result_filename));
+    let mut num_instructions = 0;
     for (i, line) in disassembled_program.iter().enumerate() {
         if !line.is_empty() {
-            writeln!(output_file, "{:03X}: {}", i, line)
-                .expect("Writing disassembled program to file");
+            writeln!(output_file, "{:03X}: {}", i, line).expect(&format!(
+                "Couldn't write disassembled program to file: {}",
+                result_filename
+            ));
+            num_instructions += 1;
         }
     }
+    println!("Wrote {} instructions to {}", num_instructions, result_filename);
 }
